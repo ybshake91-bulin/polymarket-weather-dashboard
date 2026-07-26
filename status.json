@@ -1,0 +1,119 @@
+{
+  "schema_version": "weather_public_status/1.0",
+  "generated_at": "2026-07-27T11:03:40.991172+00:00",
+  "model_version": "adaptive_mode_v2",
+  "refresh_interval_seconds": 30,
+  "backend_interval_seconds": 300,
+  "mode": "live",
+  "trade_execution_capability": true,
+  "summary": {
+    "live_count": 1,
+    "candidate_count": 0,
+    "skip_count": 2,
+    "exposure": 4.7998
+  },
+  "limits": {
+    "city": 30.0,
+    "portfolio": 90.0
+  },
+  "cities": {
+    "Wellington": {
+      "city": "Wellington",
+      "contract_date": "2026-07-27",
+      "generated_at": "2026-07-27T11:03:11.254223+00:00",
+      "status": "skip",
+      "decision": "no_action",
+      "core_label": "",
+      "pair": [],
+      "model_pair_probability": null,
+      "city_pair_hit_rate": null,
+      "decision_pair_probability": null,
+      "conservative_pair_cost": null,
+      "edge_after_cost": null,
+      "stage": 0,
+      "lifecycle_action": "initial_entry",
+      "adjustments_used": null,
+      "stage_budget_cap": null,
+      "blockers": [
+        "selected_pair_not_fillable",
+        "pair_price_above_ceiling",
+        "blended_edge_below_floor"
+      ],
+      "execution": null,
+      "preview_contract_date": "2026-07-28"
+    },
+    "Milan": {
+      "city": "Milan",
+      "contract_date": "2026-07-27",
+      "generated_at": "2026-07-27T11:03:11.254223+00:00",
+      "status": "skip",
+      "decision": "no_action",
+      "core_label": "33°C",
+      "pair": [
+        "32°C",
+        "33°C"
+      ],
+      "model_pair_probability": 0.6543092823584482,
+      "city_pair_hit_rate": 0.78,
+      "decision_pair_probability": 0.6983010335329913,
+      "conservative_pair_cost": 0.80111,
+      "edge_after_cost": -0.10280896646700866,
+      "stage": 2,
+      "lifecycle_action": "rebalance_candidate",
+      "adjustments_used": null,
+      "stage_budget_cap": 7.5,
+      "blockers": [
+        "blended_edge_below_floor"
+      ],
+      "execution": null,
+      "preview_contract_date": null
+    },
+    "Singapore": {
+      "city": "Singapore",
+      "contract_date": "2026-07-27",
+      "generated_at": "2026-07-27T11:03:11.254223+00:00",
+      "status": "live",
+      "decision": "shadow_rebalance_candidate",
+      "core_label": "31°C",
+      "pair": [
+        "30°C",
+        "31°C"
+      ],
+      "model_pair_probability": 0.6803916970977752,
+      "city_pair_hit_rate": 0.72,
+      "decision_pair_probability": 0.6942546031135539,
+      "conservative_pair_cost": 0.0461118,
+      "edge_after_cost": 0.6481428031135539,
+      "stage": 2,
+      "lifecycle_action": "rebalance_candidate",
+      "adjustments_used": null,
+      "stage_budget_cap": 7.5,
+      "blockers": [],
+      "execution": {
+        "status": "reconciled",
+        "created_at": "2026-07-26T17:18:52.802671+00:00",
+        "reconciled_at": "2026-07-26T17:20:00+00:00",
+        "exposure": 4.7998,
+        "positions": [
+          {
+            "label": "29°C",
+            "side": "YES",
+            "status": "filled_reconciled_from_position",
+            "shares": 19.7428,
+            "initial_value": 1.1899,
+            "average_price": 0.0602
+          },
+          {
+            "label": "30°C",
+            "side": "YES",
+            "status": "filled_reconciled_from_position",
+            "shares": 16.409,
+            "initial_value": 3.6099,
+            "average_price": 0.2199
+          }
+        ]
+      },
+      "preview_contract_date": "2026-07-28"
+    }
+  }
+}

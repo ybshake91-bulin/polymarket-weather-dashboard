@@ -69,3 +69,7 @@ export default {
 const workerPath = "dist/server/index.js";
 mkdirSync(dirname(workerPath), { recursive: true });
 writeFileSync(workerPath, workerSource, "utf8");
+
+mkdirSync("docs", { recursive: true });
+writeFileSync("docs/index.html", inlinedHtml, "utf8");
+writeFileSync("docs/.nojekyll", "", "utf8");

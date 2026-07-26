@@ -1,6 +1,7 @@
 type CityStatus = "live" | "skip" | "waiting";
 
 type City = {
+  key: string;
   name: string;
   code: string;
   date: string;
@@ -20,6 +21,7 @@ type City = {
 
 const cities: City[] = [
   {
+    key: "Milan",
     name: "米兰",
     code: "MILAN · LIMC",
     date: "2026-07-27",
@@ -35,6 +37,7 @@ const cities: City[] = [
     blocker: "综合概率低于保守成交成本",
   },
   {
+    key: "Singapore",
     name: "新加坡",
     code: "SINGAPORE · WSSS",
     date: "2026-07-27",
@@ -52,6 +55,7 @@ const cities: City[] = [
     positions: ["29°C Yes · 19.7428 股 · 1.19U", "30°C Yes · 16.4090 股 · 3.61U"],
   },
   {
+    key: "Wellington",
     name: "惠灵顿",
     code: "WELLINGTON · NZWN",
     date: "2026-07-28",
@@ -79,18 +83,18 @@ function Metric({ label, value, tone = "normal" }: { label: string; value: strin
 
 function CityCard({ city }: { city: City }) {
   return (
-    <article className={`card ${city.status}`}>
+    <article className={`card ${city.status}`} data-city={city.key}>
       <div className="cardTop">
         <div>
           <p className="eyebrow">{city.code}</p>
           <h2>{city.name}</h2>
         </div>
-        <span className="badge">{city.badge}</span>
+        <span className="badge" data-field="badge">{city.badge}</span>
       </div>
 
       <div className="contract">
         <span>合约日</span>
-        <b>{city.date}</b>
+        <b data-field="date">{city.date}</b>
         <i />
         <span>初盘阶段</span>
         <b>上限 9U</b>
@@ -99,37 +103,37 @@ function CityCard({ city }: { city: City }) {
       <div className="selection">
         <div>
           <span>核心档</span>
-          <strong>{city.core}</strong>
+          <strong data-field="core">{city.core}</strong>
         </div>
         <div>
           <span>双档组合</span>
-          <strong>{city.pair}</strong>
+          <strong data-field="pair">{city.pair}</strong>
         </div>
       </div>
 
       <div className="metrics">
-        <Metric label="模型双档概率" value={`${city.model.toFixed(1)}%`} />
-        <Metric label="城市收缩命中率" value={`${city.cityRate.toFixed(1)}%`} />
-        <Metric label="综合决策概率" value={`${city.decision.toFixed(1)}%`} />
-        <Metric label="保守成交成本" value={`${city.cost.toFixed(1)}%`} />
-        <Metric label="成本后边际" value={`${city.edge > 0 ? "+" : ""}${city.edge.toFixed(1)}%`} tone={city.edge > 0 ? "good" : "bad"} />
+        <div className="metric"><strong data-field="model">{city.model.toFixed(1)}%</strong><span>模型双档概率</span></div>
+        <div className="metric"><strong data-field="cityRate">{city.cityRate.toFixed(1)}%</strong><span>城市收缩命中率</span></div>
+        <div className="metric"><strong data-field="decision">{city.decision.toFixed(1)}%</strong><span>综合决策概率</span></div>
+        <div className="metric"><strong data-field="cost">{city.cost.toFixed(1)}%</strong><span>保守成交成本</span></div>
+        <div className={`metric ${city.edge > 0 ? "good" : "bad"}`} data-role="edgeMetric"><strong data-field="edge">{city.edge > 0 ? "+" : ""}{city.edge.toFixed(1)}%</strong><span>成本后边际</span></div>
         <Metric label="每城总敞口" value="≤ 30U" />
       </div>
 
-      {city.status === "live" && (
-        <div className="position">
+      <div className="position" data-field="position" hidden={city.status !== "live"}>
           <div className="positionTitle">
             <span className="pulse" />
             <b>账户已成交</b>
-            <strong>{city.exposure?.toFixed(2)}U</strong>
+            <strong data-field="exposure">{city.exposure?.toFixed(2) ?? "0.00"}U</strong>
           </div>
-          {city.positions?.map((position) => <p key={position}>{position}</p>)}
-        </div>
-      )}
+          <div data-field="positions">
+            {city.positions?.map((position) => <p key={position}>{position}</p>)}
+          </div>
+      </div>
 
       <div className="blocker">
         <span>决策说明</span>
-        <p>{city.blocker}</p>
+        <p data-field="blocker">{city.blocker}</p>
       </div>
     </article>
   );
@@ -148,8 +152,8 @@ export default function Home() {
         </div>
         <div className="snapshot">
           <span className="dot" />
-          已发布快照
-          <b>2026-07-27 01:23 CST</b>
+          <span id="feedState">实时数据连接中</span>
+          <b id="lastUpdated">—</b>
         </div>
       </header>
 
@@ -160,15 +164,15 @@ export default function Home() {
           <p>核心温度由天气模型确定；第二档综合城市历史命中率、方向信号和实时成交成本。</p>
         </div>
         <div className="summaryStats">
-          <div><strong>1</strong><span>真实持仓</span></div>
-          <div><strong>2</strong><span>当前跳过</span></div>
-          <div><strong>4.80U</strong><span>组合敞口</span></div>
+          <div><strong id="liveCount">1</strong><span>真实持仓</span></div>
+          <div><strong id="skipCount">2</strong><span>当前跳过</span></div>
+          <div><strong id="totalExposure">4.80U</strong><span>组合敞口</span></div>
         </div>
       </section>
 
       <div className="notice">
         <b>执行边界</b>
-        <span>初始盘实仓已启用；动态减仓与换档仍在影子验证。页面仅展示监控结果，不提供交易操作。</span>
+        <span>初始盘实仓已启用；动态减仓与换档仍在影子验证。页面每 30 秒读取脱敏后台状态，不提供交易操作。</span>
       </div>
 
       <section className="grid">

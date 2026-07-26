@@ -11,6 +11,7 @@
 }
 
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 
 html { background: var(--bg); }
 
@@ -102,15 +103,15 @@ h1 em { color: var(--green); font-style: normal; font-size: 15px; }
   box-shadow: 0 18px 48px rgba(0,0,0,.16);
 }
 .card::after { content: ""; position: absolute; inset: 0 0 auto; height: 2px; background: #364b44; }
-.card.live { border-color: #2e7159; }
-.card.live::after { background: linear-gradient(90deg, var(--green), transparent); }
+.card.live, .card.candidate { border-color: #2e7159; }
+.card.live::after, .card.candidate::after { background: linear-gradient(90deg, var(--green), transparent); }
 .card.skip::after { background: linear-gradient(90deg, var(--red), transparent); }
 .card.waiting::after { background: linear-gradient(90deg, var(--amber), transparent); }
 
 .cardTop { display: flex; justify-content: space-between; gap: 12px; align-items: start; }
 .cardTop h2 { margin: 0; font-size: 23px; }
 .badge { padding: 4px 9px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: 11px; }
-.live .badge { color: var(--green); border-color: #2e7159; background: rgba(66,230,164,.08); }
+.live .badge, .candidate .badge { color: var(--green); border-color: #2e7159; background: rgba(66,230,164,.08); }
 .skip .badge { color: var(--red); }
 .waiting .badge { color: var(--amber); }
 

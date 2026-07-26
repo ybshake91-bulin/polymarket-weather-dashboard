@@ -1,6 +1,7 @@
 node_modules
 .next
 out
+dist
 .open-next
 .wrangler
 npm-debug.log*

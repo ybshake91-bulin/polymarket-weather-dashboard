@@ -6,3 +6,5 @@ if (!existsSync("out")) {
 
 rmSync("dist", { recursive: true, force: true });
 cpSync("out", "dist", { recursive: true });
+cpSync("server", "dist/server", { recursive: true });
+cpSync(".openai", "dist/.openai", { recursive: true });

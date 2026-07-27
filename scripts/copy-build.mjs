@@ -36,6 +36,8 @@ const inlinedHtml = sourceHtml
 const liveFeedScript = `<script>
 (() => {
   const feedUrl = "https://raw.githubusercontent.com/ybshake91-bulin/polymarket-weather-dashboard/live-data/status.json";
+  const refUrl = "https://api.github.com/repos/ybshake91-bulin/polymarket-weather-dashboard/git/ref/heads/live-data";
+  let latestAppliedAt = 0;
   const blockerText = {
     before_initial_d1_decision: "尚未到 D-1 12:00 初盘时间",
     market_closed_or_inactive: "市场已关闭或不可交易",
@@ -62,6 +64,7 @@ const liveFeedScript = `<script>
     card.classList.add(visualStatus);
     setText(card, "badge", data.status === "live" ? "真实持仓" : data.status === "candidate" ? "候选" : data.status === "waiting" ? "等待" : "跳过");
     setText(card, "date", data.contract_date || "—");
+    setText(card, "preview", data.preview_contract_date ? "预盘 " + data.preview_contract_date : "实时主合约");
     setText(card, "core", data.core_label || "—");
     setText(card, "pair", data.pair?.length ? data.pair.join(" + ") + " Yes" : "等待模型");
     setText(card, "model", percent(data.model_pair_probability));
@@ -91,13 +94,27 @@ const liveFeedScript = `<script>
       }
     }
   };
-  const refresh = async () => {
+  const refresh = async (resolveLatest = false) => {
     const state = document.getElementById("feedState");
     try {
-      const response = await fetch(feedUrl + "?t=" + Date.now(), { cache: "no-store" });
+      let url = feedUrl + "?t=" + Date.now();
+      if (resolveLatest) {
+        const refResponse = await fetch(refUrl + "?t=" + Date.now(), { cache: "no-store" });
+        if (refResponse.ok) {
+          const ref = await refResponse.json();
+          const sha = ref?.object?.sha;
+          if (sha) {
+            url = "https://raw.githubusercontent.com/ybshake91-bulin/polymarket-weather-dashboard/" + sha + "/status.json";
+          }
+        }
+      }
+      const response = await fetch(url, { cache: "no-store" });
       if (!response.ok) throw new Error("HTTP " + response.status);
       const payload = await response.json();
       if (payload.schema_version !== "weather_public_status/1.0") throw new Error("数据格式不匹配");
+      const generatedAt = Date.parse(payload.generated_at) || 0;
+      if (generatedAt < latestAppliedAt) return;
+      latestAppliedAt = generatedAt;
       Object.entries(payload.cities || {}).forEach(([city, data]) => applyCity(city, data));
       const summary = payload.summary || {};
       document.getElementById("liveCount").textContent = String(summary.live_count ?? 0);
@@ -112,8 +129,9 @@ const liveFeedScript = `<script>
       document.body.dataset.feed = "error";
     }
   };
-  refresh();
+  refresh(true);
   window.setInterval(refresh, 30000);
+  window.setInterval(() => refresh(true), 300000);
 })();
 </script>`;
 

@@ -96,7 +96,7 @@ function CityCard({ city }: { city: City }) {
         <span>合约日</span>
         <b data-field="date">{city.date}</b>
         <i />
-        <span>初盘阶段</span>
+        <span data-field="preview">实时主合约</span>
         <b>上限 9U</b>
       </div>
 

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
   <title>WAP V4 天气交易监控</title>
-  <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./styles.css?v=202608020609">
 </head>
 <body>
   <div class="atmosphere"></div>
@@ -83,7 +83,7 @@
     <section class="panel" id="decisions">
       <header class="panel-head">
         <div><p class="kicker">DECISION ENVELOPES</p><h2>当日决策</h2></div>
-        <div class="legend"><span class="dot qualified"></span>策略通过 <span class="dot authorized"></span>实盘授权</div>
+        <div class="linked-controls"><span class="legend"><span class="dot qualified"></span>策略通过 <span class="dot authorized"></span>实盘授权</span><span class="filter-chip" id="linkedFilterLabel">当前筛选：全部城市</span><button class="filter-clear" id="clearCityFilter" type="button" hidden>清除城市筛选</button></div>
       </header>
       <div class="table-wrap">
         <table class="data-table">
@@ -106,6 +106,6 @@
 
     <footer><span>WAP V4 · READ-ONLY MONITOR</span><span id="generatedAt">—</span></footer>
   </main>
-  <script src="./app.js?v=202608020607" defer></script>
+  <script src="./app.js?v=202608020609" defer></script>
 </body>
 </html>

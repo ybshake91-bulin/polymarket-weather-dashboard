@@ -91,6 +91,7 @@ h2 { margin-bottom: 0; font-size: 20px; letter-spacing: -.025em; }
 .panel { padding: 20px; border-radius: 12px; margin-top: 10px; scroll-margin-top: 82px; }
 .panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 18px; }
 .panel-note, .legend { color: var(--muted); font-size: 10px; }
+.linked-controls { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }.filter-chip { color: var(--cyan); border: 1px solid rgba(91,225,247,.35); border-radius: 999px; padding: 5px 9px; font: 700 9px ui-monospace, monospace; }.filter-clear { cursor: pointer; border: 1px solid var(--line); border-radius: 6px; background: #0a1018; color: var(--muted); padding: 5px 9px; font: 10px ui-monospace, monospace; }.filter-clear:hover { color: var(--text); border-color: var(--line-bright); }
 .funnel { display: grid; grid-template-columns: repeat(5, 1fr); gap: 7px; }
 .funnel-step { position: relative; padding: 14px 12px; min-height: 88px; border: 1px solid var(--line); background: var(--panel-2); clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%, 10px 50%); }
 .funnel-step:first-child { clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%); }

@@ -128,13 +128,16 @@ function render(data) {
 async function refresh() {
   try {
     const staticHost = window.location.hostname.endsWith("github.io");
-    let response = await fetch(staticHost ? "./data/dashboard.json" : "/api/dashboard", {cache:"no-store"});
-    if (!response.ok) response = await fetch("./data/dashboard.json", {cache:"no-store"});
+    // GitHub Pages' CDN may retain data/dashboard.json despite no-store. A
+    // cache-busting query makes the page always request the latest snapshot.
+    const staticSnapshot = `./data/dashboard.json?v=${Date.now()}`;
+    let response = await fetch(staticHost ? staticSnapshot : "/api/dashboard", {cache:"no-store"});
+    if (!response.ok) response = await fetch(staticSnapshot, {cache:"no-store"});
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     render(await response.json());
   } catch (error) {
     try {
-      const response = await fetch("./data/dashboard.json", {cache:"no-store"});
+      const response = await fetch(`./data/dashboard.json?v=${Date.now()}`, {cache:"no-store"});
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       render(await response.json());
     } catch (_) {

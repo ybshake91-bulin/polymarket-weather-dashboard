@@ -77,7 +77,6 @@ function renderCities() {
     <td><span class="disposition ${esc(city.latestDisposition || "")}">${esc(city.latestDisposition || "等待数据")}</span><small class="sub">${esc(city.primaryBlocker || shortTime(city.latestDecisionAt))}</small></td>
   </tr>`).join("") || `<tr class="empty-row"><td colspan="6">没有符合筛选条件的城市</td></tr>`;
   byId("cityRows").querySelectorAll("tr[data-city]").forEach(row => row.addEventListener("click", () => selectCity(row.dataset.city)));
-  if (!selectedCityId && rows.length) selectCity(rows[0].cityId);
 }
 
 function metricValue(metrics, key, fallback = null) { const value = metrics?.[key]; return value == null ? fallback : Number(value); }
@@ -98,6 +97,45 @@ function selectCity(cityId) {
     <div class="detail-grid"><div><span>结算站</span><b>${esc(city.station)}</b></div><div><span>本地时区</span><b>${esc(city.timezone)}</b></div><div><span>训练日</span><b>${num(m.training_days)}</b></div><div><span>未触碰评估日</span><b>${num(m.untouched_days)}</b></div><div><span>影子候选</span><b>${num(m.executable_candidates)}</b></div><div><span>今日策略通过</span><b>${num(city.todayQualified)}</b></div></div>
     <div class="evidence"><h4>城市晋级证据</h4>${evidenceHtml}</div>
     <div class="detail-note">${city.primaryBlocker ? `当前主要阻断：${esc(city.primaryBlocker)}` : city.latestDisposition ? `最新决策：${esc(city.latestDisposition)} · ${shortTime(city.latestDecisionAt)}` : "尚无该城市今日决策。采集资格不等于交易资格。"}</div>`;
+  renderLinkedPanels();
+}
+
+function selectedCity() {
+  return payload?.cities?.find(city => city.cityId === selectedCityId) || null;
+}
+
+function cityScoped(items) {
+  return selectedCityId ? (items || []).filter(item => item.cityId === selectedCityId) : (items || []);
+}
+
+function countBy(items, field) {
+  return items.reduce((counts, item) => {
+    const value = item[field];
+    if (value) counts[value] = (counts[value] || 0) + 1;
+    return counts;
+  }, {});
+}
+
+function renderLinkedPanels() {
+  const city = selectedCity();
+  const label = city ? `${city.name} / ${city.cityId}` : "全部城市";
+  byId("linkedFilterLabel").textContent = `当前筛选：${label}`;
+  byId("clearCityFilter").hidden = !city;
+  const decisions = cityScoped(payload.decisions);
+  const orders = cityScoped(payload.orders);
+  renderDecisions(decisions); renderOrders(orders);
+  renderDistribution("dispositions", countBy(decisions, "disposition"));
+  renderDistribution("executionStates", countBy(orders, "state"));
+  const blockers = Object.entries(countBy(decisions.filter(d => d.primaryBlocker), "primaryBlocker"))
+    .map(([code, count]) => ({code, count}))
+    .sort((a, b) => b.count - a.count);
+  renderBlockers(blockers);
+}
+
+function clearCityFilter() {
+  selectedCityId = null;
+  renderCities();
+  renderLinkedPanels();
 }
 
 function renderDecisions(decisions) {
@@ -121,8 +159,8 @@ function renderBlockers(blockers) {
 function render(data) {
   payload = data;
   renderSummary(data); renderAlerts(data.alerts || []); renderFunnel(data.funnel); renderPools(data.pools);
-  renderCities(); renderDecisions(data.decisions || []); renderOrders(data.orders || []);
-  renderDistribution("dispositions", data.dispositions); renderDistribution("executionStates", data.executionStates); renderBlockers(data.topBlockers || []);
+  if (selectedCityId && !data.cities.some(city => city.cityId === selectedCityId)) selectedCityId = null;
+  renderCities(); renderLinkedPanels();
 }
 
 async function refresh() {
@@ -150,5 +188,6 @@ async function refresh() {
 
 byId("citySearch").addEventListener("input", renderCities);
 byId("poolFilter").addEventListener("change", renderCities);
+byId("clearCityFilter").addEventListener("click", clearCityFilter);
 setInterval(() => byId("clock").textContent = new Date().toLocaleTimeString("zh-CN", {hour12:false}), 1000);
 refresh(); setInterval(refresh, 15000);

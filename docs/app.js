@@ -127,7 +127,8 @@ function render(data) {
 
 async function refresh() {
   try {
-    let response = await fetch("/api/dashboard", {cache:"no-store"});
+    const staticHost = window.location.hostname.endsWith("github.io");
+    let response = await fetch(staticHost ? "./data/dashboard.json" : "/api/dashboard", {cache:"no-store"});
     if (!response.ok) response = await fetch("./data/dashboard.json", {cache:"no-store"});
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     render(await response.json());

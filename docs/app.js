@@ -1,0 +1,150 @@
+const byId = id => document.getElementById(id);
+let payload = null;
+let selectedCityId = null;
+
+const esc = value => String(value ?? "—").replace(/[&<>'"]/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;"}[char]));
+const num = (value, digits = 0) => value == null ? "—" : Number(value).toLocaleString("zh-CN", {minimumFractionDigits: digits, maximumFractionDigits: digits});
+const pct = value => value == null ? "—" : `${num(Number(value) * 100, 1)}%`;
+const money = value => value == null ? "—" : `${Number(value) >= 0 ? "+" : ""}${num(value, 2)} U`;
+const shortTime = value => value ? new Date(value).toLocaleTimeString("zh-CN", {hour:"2-digit", minute:"2-digit", second:"2-digit", hour12:false}) : "—";
+const freshness = seconds => seconds == null ? "等待首条运行数据" : seconds < 60 ? `${seconds} 秒前更新` : seconds < 3600 ? `${Math.floor(seconds/60)} 分钟前更新` : `${Math.floor(seconds/3600)} 小时前更新`;
+const statusClass = status => `status-${esc(status)}`;
+const poolLabel = status => ({COLLECT_FULL:"完整采集",COLLECT_LITE:"轻量采集",MODEL_ELIGIBLE:"模型合格",SHADOW_ELIGIBLE:"影子合格",CASH_ELIGIBLE:"现金合格",BLOCKED_RULE:"规则阻断",BLOCKED_DATA:"数据阻断",BLOCKED_SKILL:"模型阻断",BLOCKED_LIQUIDITY:"流动性阻断",SUSPENDED_RISK:"风险暂停",UNIVERSE:"候选全集"}[status] || status);
+
+function renderSummary(data) {
+  const s = data.summary;
+  byId("metricCities").textContent = num(s.cities);
+  byId("metricPools").textContent = `完整 ${s.fullCollection} · 轻量 ${s.liteCollection} · 阻断 ${s.blockedCities}`;
+  byId("metricDecisions").textContent = num(s.todayDecisions);
+  byId("metricQualified").textContent = `策略通过 ${s.strategyQualified}`;
+  byId("metricPlans").textContent = num(s.plannedOrders);
+  byId("metricAuthorized").textContent = `实盘授权 ${s.executionAuthorized}`;
+  byId("metricFillRate").textContent = pct(s.fillRate);
+  byId("metricFilled").textContent = `成交 ${s.filledOrders} / 提交 ${s.submittedOrders}`;
+  byId("metricRisk").textContent = money(s.openRiskU);
+  byId("metricStake").textContent = `今日成交额 ${num(s.filledStakeU, 2)} U`;
+  byId("metricPnl").textContent = money(s.realizedPnlU);
+  byId("metricPnl").className = Number(s.realizedPnlU) > 0 ? "positive" : Number(s.realizedPnlU) < 0 ? "negative" : "";
+  byId("businessDate").textContent = `业务日期 / ${data.businessDate}`;
+  byId("modePill").textContent = data.health.mode;
+  byId("livePill").textContent = data.health.liveEnabled ? "实盘开启" : "实盘关闭";
+  byId("healthLabel").textContent = data.health.status;
+  byId("freshness").textContent = freshness(data.health.freshnessSeconds);
+  byId("systemState").classList.toggle("online", data.health.status === "ONLINE");
+  byId("generatedAt").textContent = `SNAPSHOT ${new Date(data.generatedAt).toLocaleString("zh-CN", {hour12:false})}`;
+}
+
+function renderAlerts(alerts) {
+  byId("alerts").innerHTML = alerts.map(a => `<div class="alert ${esc(a.level)}"><b>${esc(a.code)}</b><span>${esc(a.message)}</span></div>`).join("");
+}
+
+function renderFunnel(funnel) {
+  const steps = [["决策重估",funnel.decisionEvents],["策略通过",funnel.strategyQualified],["生成计划",funnel.planned],["提交执行",funnel.submitted],["完整成交",funnel.filled]];
+  byId("funnel").innerHTML = steps.map((step, index) => {
+    const base = index ? Number(steps[index-1][1]) : Number(step[1]);
+    const rate = index ? (base ? Number(step[1]) / base : 0) : 1;
+    return `<div class="funnel-step"><span>${esc(step[0])}</span><strong>${num(step[1])}</strong><small>${index ? `阶段转化 ${pct(rate)}` : "有效重估事件"}</small></div>`;
+  }).join("");
+}
+
+function renderPools(pools) {
+  const entries = Object.entries(pools);
+  const max = Math.max(1, ...entries.map(([,count]) => Number(count)));
+  byId("poolTotal").textContent = `${entries.reduce((sum,[,count]) => sum + Number(count), 0)} CITY REGISTRY`;
+  byId("poolBars").innerHTML = entries.map(([status,count]) => `<div class="bar-row"><span>${esc(poolLabel(status))}</span><div class="bar-track"><div class="bar-fill" style="width:${Number(count)/max*100}%"></div></div><b>${num(count)}</b></div>`).join("");
+  const select = byId("poolFilter");
+  const selected = select.value;
+  select.innerHTML = `<option value="ALL">全部城市池</option>` + entries.map(([status]) => `<option value="${esc(status)}">${esc(poolLabel(status))}</option>`).join("");
+  if ([...select.options].some(option => option.value === selected)) select.value = selected;
+}
+
+function cityRows() {
+  const query = byId("citySearch").value.trim().toLowerCase();
+  const pool = byId("poolFilter").value;
+  return payload.cities.filter(city => {
+    const text = `${city.name} ${city.cityId} ${city.station || ""} ${city.correlationGroup}`.toLowerCase();
+    return (!query || text.includes(query)) && (pool === "ALL" || city.poolStatus === pool);
+  });
+}
+
+function renderCities() {
+  const rows = cityRows();
+  byId("cityRows").innerHTML = rows.map(city => `<tr data-city="${esc(city.cityId)}" class="${city.cityId === selectedCityId ? "selected" : ""}">
+    <td class="city-name"><b>${esc(city.name)}</b><small>${esc(city.cityId)}</small></td>
+    <td><span class="status-badge ${statusClass(city.poolStatus)}">${esc(poolLabel(city.poolStatus))}</span></td>
+    <td><span>${esc(city.station)}</span><small class="sub">${esc(city.timezone)}</small></td>
+    <td>${esc(city.correlationGroup)}</td><td><b>${num(city.todayDecisions)}</b><small class="sub">通过 ${num(city.todayQualified)} · 计划 ${num(city.todayPlans)}</small></td>
+    <td><span class="disposition ${esc(city.latestDisposition || "")}">${esc(city.latestDisposition || "等待数据")}</span><small class="sub">${esc(city.primaryBlocker || shortTime(city.latestDecisionAt))}</small></td>
+  </tr>`).join("") || `<tr class="empty-row"><td colspan="6">没有符合筛选条件的城市</td></tr>`;
+  byId("cityRows").querySelectorAll("tr[data-city]").forEach(row => row.addEventListener("click", () => selectCity(row.dataset.city)));
+  if (!selectedCityId && rows.length) selectCity(rows[0].cityId);
+}
+
+function metricValue(metrics, key, fallback = null) { const value = metrics?.[key]; return value == null ? fallback : Number(value); }
+function selectCity(cityId) {
+  selectedCityId = cityId;
+  const city = payload.cities.find(item => item.cityId === cityId);
+  if (!city) return;
+  byId("cityRows").querySelectorAll("tr").forEach(row => row.classList.toggle("selected", row.dataset.city === cityId));
+  const m = city.metrics || {};
+  const evidence = [
+    ["时间点完整率", metricValue(m,"point_in_time_completeness"), v => pct(v)],
+    ["盘口完整率", metricValue(m,"book_completeness"), v => pct(v)],
+    ["模型技能改善", metricValue(m,"proper_score_improvement"), v => pct(v)],
+    ["校准质量 (1-ECE)", m.ece == null ? null : Math.max(0,1-Number(m.ece)), v => pct(v)],
+  ];
+  const evidenceHtml = evidence.map(([label,value,format]) => `<div class="evidence-row"><div><span>${label}</span><b>${value == null ? "未采集" : format(value)}</b></div><div class="bar-track"><div class="bar-fill" style="width:${value == null ? 0 : Math.max(0,Math.min(1,value))*100}%"></div></div></div>`).join("");
+  byId("cityDetail").innerHTML = `<div class="detail-top"><div><h3>${esc(city.name)}</h3><p>${esc(city.cityId)} · ${esc(city.correlationGroup)}</p></div><span class="status-badge ${statusClass(city.poolStatus)}">${esc(poolLabel(city.poolStatus))}</span></div>
+    <div class="detail-grid"><div><span>结算站</span><b>${esc(city.station)}</b></div><div><span>本地时区</span><b>${esc(city.timezone)}</b></div><div><span>训练日</span><b>${num(m.training_days)}</b></div><div><span>未触碰评估日</span><b>${num(m.untouched_days)}</b></div><div><span>影子候选</span><b>${num(m.executable_candidates)}</b></div><div><span>今日策略通过</span><b>${num(city.todayQualified)}</b></div></div>
+    <div class="evidence"><h4>城市晋级证据</h4>${evidenceHtml}</div>
+    <div class="detail-note">${city.primaryBlocker ? `当前主要阻断：${esc(city.primaryBlocker)}` : city.latestDisposition ? `最新决策：${esc(city.latestDisposition)} · ${shortTime(city.latestDecisionAt)}` : "尚无该城市今日决策。采集资格不等于交易资格。"}</div>`;
+}
+
+function renderDecisions(decisions) {
+  byId("decisionRows").innerHTML = decisions.map(d => `<tr><td>${shortTime(d.emittedAt)}<small class="sub">${esc(d.decisionId)}</small></td><td><b>${esc(d.cityId)}</b><small class="sub">${esc(d.contractDate)}</small></td><td><span class="disposition ${esc(d.disposition)}">${esc(d.disposition)}</span></td><td>${esc(d.strategyAction)}<small class="sub">${esc((d.labels || []).join(" + ") || "—")}</small></td><td>${d.pCons == null ? "—" : pct(d.pCons)}<small class="sub">包价 ${d.packageCost == null ? "—" : num(d.packageCost,4)}</small></td><td class="${Number(d.expectedRoi) > 0 ? "positive" : Number(d.expectedRoi) < 0 ? "negative" : ""}">${pct(d.expectedRoi)}</td><td><div class="auth-stack" title="左：策略通过；右：实盘授权"><i class="auth-chip strategy ${d.strategyQualified ? "on" : ""}"></i><i class="auth-chip live ${d.executionAuthorized ? "on" : ""}"></i></div></td><td>${esc(d.primaryBlocker || "—")}</td></tr>`).join("") || `<tr class="empty-row"><td colspan="8">今日尚无决策。通过 CLI 或运行服务写入 monitoring.db 后会自动展示。</td></tr>`;
+}
+
+function renderOrders(orders) {
+  byId("orderGrid").innerHTML = orders.map(order => `<article class="order-card"><header><div><h3>${esc(order.cityId)} · ${esc(order.strategyAction)}</h3><p>${esc(order.planId)}</p></div><span class="status-badge status-${esc(order.state)}">${esc(order.state)}</span></header><div class="order-main"><div><span>计划仓位</span><b>${num(order.requestedStake,2)} U</b></div><div><span>执行方式</span><b>${esc(order.executionStyle)}</b></div></div><div class="legs">${(order.legs || []).map(leg => `<div class="leg"><span>${esc(leg.side)} ${esc(leg.label)}</span><span>@ ${num(leg.limit_price,4)}</span><span>${num(leg.shares,2)} 股</span></div>`).join("")}</div><div class="order-foot"><span>${order.executionAuthorized ? "实盘已授权" : "仅 Paper / Shadow"}</span><span>到期 ${shortTime(order.expiresAt)}</span></div></article>`).join("") || `<div class="empty-detail"><span>⌁</span><p>今日尚无可执行订单计划</p></div>`;
+}
+
+function renderDistribution(targetId, values) {
+  const entries = Object.entries(values || {}).sort((a,b) => Number(b[1])-Number(a[1]));
+  const max = Math.max(1,...entries.map(([,value]) => Number(value)));
+  byId(targetId).innerHTML = entries.map(([label,value]) => `<div class="distribution-row"><label>${esc(label)}</label><div class="bar-track"><div class="bar-fill" style="width:${Number(value)/max*100}%"></div></div><b>${num(value)}</b></div>`).join("") || `<div class="empty-detail"><p>等待当日数据</p></div>`;
+}
+
+function renderBlockers(blockers) {
+  byId("blockers").innerHTML = blockers.map(item => `<div class="blocker"><span title="${esc(item.code)}">${esc(item.code)}</span><b>${num(item.count)}</b></div>`).join("") || `<div class="empty-detail"><p>今日没有结构化阻断记录</p></div>`;
+}
+
+function render(data) {
+  payload = data;
+  renderSummary(data); renderAlerts(data.alerts || []); renderFunnel(data.funnel); renderPools(data.pools);
+  renderCities(); renderDecisions(data.decisions || []); renderOrders(data.orders || []);
+  renderDistribution("dispositions", data.dispositions); renderDistribution("executionStates", data.executionStates); renderBlockers(data.topBlockers || []);
+}
+
+async function refresh() {
+  try {
+    let response = await fetch("/api/dashboard", {cache:"no-store"});
+    if (!response.ok) response = await fetch("./data/dashboard.json", {cache:"no-store"});
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    render(await response.json());
+  } catch (error) {
+    try {
+      const response = await fetch("./data/dashboard.json", {cache:"no-store"});
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      render(await response.json());
+    } catch (_) {
+      byId("healthLabel").textContent = "OFFLINE";
+      byId("freshness").textContent = error.message;
+      byId("systemState").classList.remove("online");
+    }
+  }
+}
+
+byId("citySearch").addEventListener("input", renderCities);
+byId("poolFilter").addEventListener("change", renderCities);
+setInterval(() => byId("clock").textContent = new Date().toLocaleTimeString("zh-CN", {hour12:false}), 1000);
+refresh(); setInterval(refresh, 15000);

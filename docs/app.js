@@ -10,6 +10,8 @@ const shortTime = value => value ? new Date(value).toLocaleTimeString("zh-CN", {
 const freshness = seconds => seconds == null ? "等待首条运行数据" : seconds < 60 ? `${seconds} 秒前更新` : seconds < 3600 ? `${Math.floor(seconds/60)} 分钟前更新` : `${Math.floor(seconds/3600)} 小时前更新`;
 const statusClass = status => `status-${esc(status)}`;
 const poolLabel = status => ({COLLECT_FULL:"完整采集",COLLECT_LITE:"轻量采集",MODEL_ELIGIBLE:"模型合格",SHADOW_ELIGIBLE:"影子合格",CASH_ELIGIBLE:"现金合格",BLOCKED_RULE:"规则阻断",BLOCKED_DATA:"数据阻断",BLOCKED_SKILL:"模型阻断",BLOCKED_LIQUIDITY:"流动性阻断",SUSPENDED_RISK:"风险暂停",UNIVERSE:"候选全集"}[status] || status);
+const dispositionLabel = status => ({EXECUTE_NOW:"可立即执行",POST_MAKER:"可挂限价单",WAIT:"等待更新",SKIP:"暂不操作",HOLD:"持有观察",REDUCE:"减仓",EXIT:"退出",REBALANCE:"调仓",BLOCKED:"被硬性阻断"}[status] || status || "等待数据");
+const blockerLabel = (code, explanation) => explanation?.label || ({DAILY_NEW_RISK_LIMIT:"今日新增风险额度已满",CITY_NOT_SHADOW_ELIGIBLE:"城市未获策略准入",CITY_BLOCKED_RULE:"城市规则禁止",WEATHER_DATA_STALE:"天气数据已过期",MARKET_BOOK_STALE:"盘口快照已过期",MARKET_BOOK_SEQUENCE_GAP:"盘口序列不连续",MARKET_BUCKET_MAPPING_MISMATCH:"合约档位映射异常",CONTRACT_RULES_UNVERIFIED:"合约规则未验证",VALUATION_INPUT_INVALID:"估值输入不合法",RISK_LIMIT_BLOCKED:"风险规则阻断",NO_POSITIVE_EXECUTABLE_ACTION:"没有可成交的正期望机会"}[code] || code || "无阻断");
 
 function renderSummary(data) {
   const s = data.summary;
@@ -74,7 +76,7 @@ function renderCities() {
     <td><span class="status-badge ${statusClass(city.poolStatus)}">${esc(poolLabel(city.poolStatus))}</span></td>
     <td><span>${esc(city.station)}</span><small class="sub">${esc(city.timezone)}</small></td>
     <td>${esc(city.correlationGroup)}</td><td><b>${num(city.todayDecisions)}</b><small class="sub">通过 ${num(city.todayQualified)} · 计划 ${num(city.todayPlans)}</small></td>
-    <td><span class="disposition ${esc(city.latestDisposition || "")}">${esc(city.latestDisposition || "等待数据")}</span><small class="sub">${esc(city.primaryBlocker || shortTime(city.latestDecisionAt))}</small></td>
+    <td><span class="disposition ${esc(city.latestDisposition || "")}">${esc(city.latestDispositionLabel || dispositionLabel(city.latestDisposition))}</span><small class="sub" title="${esc(city.primaryBlockerExplanation?.condition || city.primaryBlocker || "")}">${esc(blockerLabel(city.primaryBlocker, city.primaryBlockerExplanation))}</small></td>
   </tr>`).join("") || `<tr class="empty-row"><td colspan="6">没有符合筛选条件的城市</td></tr>`;
   byId("cityRows").querySelectorAll("tr[data-city]").forEach(row => row.addEventListener("click", () => selectCity(row.dataset.city)));
 }
@@ -96,7 +98,7 @@ function selectCity(cityId) {
   byId("cityDetail").innerHTML = `<div class="detail-top"><div><h3>${esc(city.name)}</h3><p>${esc(city.cityId)} · ${esc(city.correlationGroup)}</p></div><span class="status-badge ${statusClass(city.poolStatus)}">${esc(poolLabel(city.poolStatus))}</span></div>
     <div class="detail-grid"><div><span>结算站</span><b>${esc(city.station)}</b></div><div><span>本地时区</span><b>${esc(city.timezone)}</b></div><div><span>训练日</span><b>${num(m.training_days)}</b></div><div><span>未触碰评估日</span><b>${num(m.untouched_days)}</b></div><div><span>影子候选</span><b>${num(m.executable_candidates)}</b></div><div><span>今日策略通过</span><b>${num(city.todayQualified)}</b></div></div>
     <div class="evidence"><h4>城市晋级证据</h4>${evidenceHtml}</div>
-    <div class="detail-note">${city.primaryBlocker ? `当前主要阻断：${esc(city.primaryBlocker)}` : city.latestDisposition ? `最新决策：${esc(city.latestDisposition)} · ${shortTime(city.latestDecisionAt)}` : "尚无该城市今日决策。采集资格不等于交易资格。"}</div>`;
+    <div class="detail-note">${city.primaryBlocker ? `<b>当前主要阻断：${esc(blockerLabel(city.primaryBlocker, city.primaryBlockerExplanation))}</b><br>${esc(city.primaryBlockerExplanation?.description || "")}<br><small>判定：${esc(city.primaryBlockerExplanation?.condition || city.primaryBlocker)}｜解除：${esc(city.primaryBlockerExplanation?.recovery || "等待重新评估")}</small>` : city.latestDisposition ? `最新决策：${esc(city.latestDispositionLabel || dispositionLabel(city.latestDisposition))} · ${shortTime(city.latestDecisionAt)}` : `${esc(city.poolExplanation?.description || "尚无该城市今日决策。采集资格不等于交易资格。")}`}</div>`;
   renderLinkedPanels();
 }
 
@@ -139,7 +141,7 @@ function clearCityFilter() {
 }
 
 function renderDecisions(decisions) {
-  byId("decisionRows").innerHTML = decisions.map(d => `<tr><td>${shortTime(d.emittedAt)}<small class="sub">${esc(d.decisionId)}</small></td><td><b>${esc(d.cityId)}</b><small class="sub">${esc(d.contractDate)}</small></td><td><span class="disposition ${esc(d.disposition)}">${esc(d.disposition)}</span></td><td>${esc(d.strategyAction)}<small class="sub">${esc((d.labels || []).join(" + ") || "—")}</small></td><td>${d.pCons == null ? "—" : pct(d.pCons)}<small class="sub">包价 ${d.packageCost == null ? "—" : num(d.packageCost,4)}</small></td><td class="${Number(d.expectedRoi) > 0 ? "positive" : Number(d.expectedRoi) < 0 ? "negative" : ""}">${pct(d.expectedRoi)}</td><td><div class="auth-stack" title="左：策略通过；右：实盘授权"><i class="auth-chip strategy ${d.strategyQualified ? "on" : ""}"></i><i class="auth-chip live ${d.executionAuthorized ? "on" : ""}"></i></div></td><td>${esc(d.primaryBlocker || "—")}</td></tr>`).join("") || `<tr class="empty-row"><td colspan="8">今日尚无决策。通过 CLI 或运行服务写入 monitoring.db 后会自动展示。</td></tr>`;
+  byId("decisionRows").innerHTML = decisions.map(d => `<tr><td>${shortTime(d.emittedAt)}<small class="sub">${esc(d.decisionId)}</small></td><td><b>${esc(d.cityId)}</b><small class="sub">${esc(d.contractDate)}</small></td><td><span class="disposition ${esc(d.disposition)}">${esc(d.dispositionLabel || dispositionLabel(d.disposition))}</span><small class="sub">${esc(d.disposition)}</small></td><td>${esc(d.strategyAction)}<small class="sub">${esc((d.labels || []).join(" + ") || "—")}</small></td><td>${d.pCons == null ? "—" : pct(d.pCons)}<small class="sub">包价 ${d.packageCost == null ? "—" : num(d.packageCost,4)}</small></td><td class="${Number(d.expectedRoi) > 0 ? "positive" : Number(d.expectedRoi) < 0 ? "negative" : ""}">${pct(d.expectedRoi)}</td><td><div class="auth-stack" title="左：策略通过；右：实盘授权"><i class="auth-chip strategy ${d.strategyQualified ? "on" : ""}"></i><i class="auth-chip live ${d.executionAuthorized ? "on" : ""}"></i></div></td><td title="${esc(d.primaryBlockerExplanation?.condition || d.primaryBlocker || "")}">${esc(blockerLabel(d.primaryBlocker, d.primaryBlockerExplanation))}<small class="sub">${esc(d.primaryBlocker || "—")}</small></td></tr>`).join("") || `<tr class="empty-row"><td colspan="8">今日尚无决策。通过 CLI 或运行服务写入 monitoring.db 后会自动展示。</td></tr>`;
 }
 
 function renderOrders(orders) {
@@ -153,7 +155,7 @@ function renderDistribution(targetId, values) {
 }
 
 function renderBlockers(blockers) {
-  byId("blockers").innerHTML = blockers.map(item => `<div class="blocker"><span title="${esc(item.code)}">${esc(item.code)}</span><b>${num(item.count)}</b></div>`).join("") || `<div class="empty-detail"><p>今日没有结构化阻断记录</p></div>`;
+  byId("blockers").innerHTML = blockers.map(item => `<div class="blocker"><span title="${esc(item.code)}">${esc(blockerLabel(item.code))}<small>${esc(item.code)}</small></span><b>${num(item.count)}</b></div>`).join("") || `<div class="empty-detail"><p>今日没有结构化阻断记录</p></div>`;
 }
 
 function render(data) {

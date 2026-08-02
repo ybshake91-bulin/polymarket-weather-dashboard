@@ -78,7 +78,7 @@ function renderCities() {
     <td><span class="status-badge ${statusClass(city.poolStatus)}">${esc(poolLabel(city.poolStatus, city.poolExplanation))}</span></td>
     <td><span>${esc(city.station)}</span><small class="sub">${esc(city.timezone)}</small></td>
     <td>${esc(city.correlationGroup)}</td><td><b>${num(city.todayDecisions)}</b><small class="sub">通过 ${num(city.todayQualified)} · 计划 ${num(city.todayPlans)}</small></td>
-    <td><span class="disposition ${esc(city.latestDisposition || "")}">${esc(city.latestDispositionLabel || dispositionLabel(city.latestDisposition))}</span><small class="sub" title="${esc(city.primaryBlockerExplanation?.condition || city.primaryBlocker || "")}">${esc(blockerLabel(city.primaryBlocker, city.primaryBlockerExplanation))}</small></td>
+    <td><span class="disposition ${esc(city.latestDisposition || "")}">${esc(city.sourceHealth?.status === "DEGRADED" ? `采集受阻：${city.sourceHealth.code || city.sourceHealth.source}` : (city.latestDispositionLabel || dispositionLabel(city.latestDisposition)))}</span><small class="sub" title="${esc(city.sourceHealth?.status === "DEGRADED" ? city.sourceHealth.message : (city.primaryBlockerExplanation?.condition || city.primaryBlocker || ""))}">${esc(city.sourceHealth?.status === "DEGRADED" ? "非策略等待；上游数据源限流" : blockerLabel(city.primaryBlocker, city.primaryBlockerExplanation))}</small></td>
   </tr>`).join("") || `<tr class="empty-row"><td colspan="6">没有符合筛选条件的城市</td></tr>`;
   byId("cityRows").querySelectorAll("tr[data-city]").forEach(row => row.addEventListener("click", () => selectCity(row.dataset.city)));
 }

@@ -9,7 +9,7 @@ const money = value => value == null ? "—" : `${Number(value) >= 0 ? "+" : ""}
 const shortTime = value => value ? new Date(value).toLocaleTimeString("zh-CN", {hour:"2-digit", minute:"2-digit", second:"2-digit", hour12:false}) : "—";
 const freshness = seconds => seconds == null ? "等待首条运行数据" : seconds < 60 ? `${seconds} 秒前更新` : seconds < 3600 ? `${Math.floor(seconds/60)} 分钟前更新` : `${Math.floor(seconds/3600)} 小时前更新`;
 const statusClass = status => `status-${esc(status)}`;
-const poolLabel = status => ({COLLECT_FULL:"完整采集",COLLECT_LITE:"轻量采集",MODEL_ELIGIBLE:"模型合格",SHADOW_ELIGIBLE:"影子合格",CASH_ELIGIBLE:"现金合格",BLOCKED_RULE:"规则阻断",BLOCKED_DATA:"数据阻断",BLOCKED_SKILL:"模型阻断",BLOCKED_LIQUIDITY:"流动性阻断",SUSPENDED_RISK:"风险暂停",UNIVERSE:"候选全集"}[status] || status);
+const poolLabel = (status, explanation) => explanation?.label || ({COLLECT_FULL:"完整采集",COLLECT_LITE:"轻量采集",MODEL_ELIGIBLE:"模型合格",SHADOW_ELIGIBLE:"影子合格",CASH_ELIGIBLE:"现金合格",BLOCKED_RULE:"规则阻断",BLOCKED_DATA:"数据阻断",BLOCKED_SKILL:"模型阻断",BLOCKED_LIQUIDITY:"流动性阻断",SUSPENDED_RISK:"风险暂停",UNIVERSE:"候选全集"}[status] || status);
 const dispositionLabel = status => ({EXECUTE_NOW:"可立即执行",POST_MAKER:"可挂限价单",WAIT:"等待更新",SKIP:"暂不操作",HOLD:"持有观察",REDUCE:"减仓",EXIT:"退出",REBALANCE:"调仓",BLOCKED:"被硬性阻断"}[status] || status || "等待数据");
 const blockerLabel = (code, explanation) => explanation?.label || ({DAILY_NEW_RISK_LIMIT:"今日新增风险额度已满",CITY_NOT_SHADOW_ELIGIBLE:"城市未获策略准入",CITY_BLOCKED_RULE:"城市规则禁止",WEATHER_DATA_STALE:"天气数据已过期",MARKET_BOOK_STALE:"盘口快照已过期",MARKET_BOOK_SEQUENCE_GAP:"盘口序列不连续",MARKET_BUCKET_MAPPING_MISMATCH:"合约档位映射异常",CONTRACT_RULES_UNVERIFIED:"合约规则未验证",VALUATION_INPUT_INVALID:"估值输入不合法",RISK_LIMIT_BLOCKED:"风险规则阻断",NO_POSITIVE_EXECUTABLE_ACTION:"没有可成交的正期望机会"}[code] || code || "无阻断");
 
@@ -73,7 +73,7 @@ function renderCities() {
   const rows = cityRows();
   byId("cityRows").innerHTML = rows.map(city => `<tr data-city="${esc(city.cityId)}" class="${city.cityId === selectedCityId ? "selected" : ""}">
     <td class="city-name"><b>${esc(city.name)}</b><small>${esc(city.cityId)}</small></td>
-    <td><span class="status-badge ${statusClass(city.poolStatus)}">${esc(poolLabel(city.poolStatus))}</span></td>
+    <td><span class="status-badge ${statusClass(city.poolStatus)}">${esc(poolLabel(city.poolStatus, city.poolExplanation))}</span></td>
     <td><span>${esc(city.station)}</span><small class="sub">${esc(city.timezone)}</small></td>
     <td>${esc(city.correlationGroup)}</td><td><b>${num(city.todayDecisions)}</b><small class="sub">通过 ${num(city.todayQualified)} · 计划 ${num(city.todayPlans)}</small></td>
     <td><span class="disposition ${esc(city.latestDisposition || "")}">${esc(city.latestDispositionLabel || dispositionLabel(city.latestDisposition))}</span><small class="sub" title="${esc(city.primaryBlockerExplanation?.condition || city.primaryBlocker || "")}">${esc(blockerLabel(city.primaryBlocker, city.primaryBlockerExplanation))}</small></td>
@@ -95,7 +95,7 @@ function selectCity(cityId) {
     ["校准质量 (1-ECE)", m.ece == null ? null : Math.max(0,1-Number(m.ece)), v => pct(v)],
   ];
   const evidenceHtml = evidence.map(([label,value,format]) => `<div class="evidence-row"><div><span>${label}</span><b>${value == null ? "未采集" : format(value)}</b></div><div class="bar-track"><div class="bar-fill" style="width:${value == null ? 0 : Math.max(0,Math.min(1,value))*100}%"></div></div></div>`).join("");
-  byId("cityDetail").innerHTML = `<div class="detail-top"><div><h3>${esc(city.name)}</h3><p>${esc(city.cityId)} · ${esc(city.correlationGroup)}</p></div><span class="status-badge ${statusClass(city.poolStatus)}">${esc(poolLabel(city.poolStatus))}</span></div>
+  byId("cityDetail").innerHTML = `<div class="detail-top"><div><h3>${esc(city.name)}</h3><p>${esc(city.cityId)} · ${esc(city.correlationGroup)}</p></div><span class="status-badge ${statusClass(city.poolStatus)}">${esc(poolLabel(city.poolStatus, city.poolExplanation))}</span></div>
     <div class="detail-grid"><div><span>结算站</span><b>${esc(city.station)}</b></div><div><span>本地时区</span><b>${esc(city.timezone)}</b></div><div><span>训练日</span><b>${num(m.training_days)}</b></div><div><span>未触碰评估日</span><b>${num(m.untouched_days)}</b></div><div><span>影子候选</span><b>${num(m.executable_candidates)}</b></div><div><span>今日策略通过</span><b>${num(city.todayQualified)}</b></div></div>
     <div class="evidence"><h4>城市晋级证据</h4>${evidenceHtml}</div>
     <div class="detail-note">${city.primaryBlocker ? `<b>当前主要阻断：${esc(blockerLabel(city.primaryBlocker, city.primaryBlockerExplanation))}</b><br>${esc(city.primaryBlockerExplanation?.description || "")}<br><small>判定：${esc(city.primaryBlockerExplanation?.condition || city.primaryBlocker)}｜解除：${esc(city.primaryBlockerExplanation?.recovery || "等待重新评估")}</small>` : city.latestDisposition ? `最新决策：${esc(city.latestDispositionLabel || dispositionLabel(city.latestDisposition))} · ${shortTime(city.latestDecisionAt)}` : `${esc(city.poolExplanation?.description || "尚无该城市今日决策。采集资格不等于交易资格。")}`}</div>`;

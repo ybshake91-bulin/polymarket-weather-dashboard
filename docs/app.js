@@ -30,7 +30,9 @@ function renderSummary(data) {
   byId("businessDate").textContent = `业务日期 / ${data.businessDate}`;
   byId("modePill").textContent = data.health.mode;
   byId("livePill").textContent = data.health.liveEnabled ? "实盘开启" : "实盘关闭";
-  byId("healthLabel").textContent = data.health.status;
+  const pipeline = data.health.pipeline || {};
+  const pipelineText = pipeline.status && pipeline.status !== "OK" ? ` · 数据链路 ${pipeline.status}${pipeline.error?.code ? ` (${pipeline.error.code})` : ""}` : "";
+  byId("healthLabel").textContent = `${data.health.status}${pipelineText}`;
   byId("freshness").textContent = freshness(data.health.freshnessSeconds);
   byId("systemState").classList.toggle("online", data.health.status === "ONLINE");
   byId("generatedAt").textContent = `SNAPSHOT ${new Date(data.generatedAt).toLocaleString("zh-CN", {hour12:false})}`;

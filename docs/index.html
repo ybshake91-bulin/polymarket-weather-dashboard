@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
   <title>WAP V4 天气交易监控</title>
-  <link rel="stylesheet" href="./styles.css?v=202608020620">
+  <link rel="stylesheet" href="./styles.css?v=202608031020">
 </head>
 <body>
   <div class="atmosphere"></div>
@@ -47,6 +47,11 @@
     </section>
 
     <section class="alert-stack" id="alerts"></section>
+
+    <section class="panel quota-panel" id="paper-slots">
+      <header class="panel-head"><div><p class="kicker">PAPER RISK RESERVATIONS</p><h2>今日纸面决策名额</h2></div><span class="panel-note" id="slotUsage">—</span></header>
+      <div class="slot-grid" id="reservedPlanGrid"></div>
+    </section>
 
     <section class="split-grid">
       <article class="panel funnel-panel">
@@ -106,6 +111,6 @@
 
     <footer><span>WAP V4 · READ-ONLY MONITOR</span><span id="generatedAt">—</span></footer>
   </main>
-  <script src="./app.js?v=202608021752" defer></script>
+  <script src="./app.js?v=202608031020" defer></script>
 </body>
 </html>

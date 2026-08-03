@@ -42,6 +42,17 @@ function renderAlerts(alerts) {
   byId("alerts").innerHTML = alerts.map(a => `<div class="alert ${esc(a.level)}"><b>${esc(a.code)}</b><span>${esc(a.message)}</span></div>`).join("");
 }
 
+function renderReservedPlans(plans, paperRisk) {
+  const maximum = paperRisk?.globalUsage?.maxPlans;
+  byId("slotUsage").textContent = `${num(plans.length)} / ${num(maximum)} 名额已占用 · UTC ${esc(paperRisk?.reservationDate)}`;
+  byId("reservedPlanGrid").innerHTML = plans.map(plan => `<article class="slot-card">
+    <div class="slot-number">${num(plan.slot)}</div>
+    <div><b>${esc(plan.cityId)}</b><small>${esc(plan.contractDate)} · ${esc(plan.executionStyle)}</small></div>
+    <div><strong>${esc((plan.labels || []).join(" + ") || "—")}</strong><small>${esc(plan.strategyAction)} · ${num(plan.requestedStake, 2)} U</small></div>
+    <span class="status-badge status-SHADOW_ELIGIBLE">纸面名额已占用</span>
+  </article>`).join("") || `<div class="empty-detail slot-empty"><p>今日尚无纸面计划占用名额</p></div>`;
+}
+
 function renderFunnel(funnel) {
   const steps = [["决策重估",funnel.decisionEvents],["策略通过",funnel.strategyQualified],["生成计划",funnel.planned],["提交执行",funnel.submitted],["完整成交",funnel.filled]];
   byId("funnel").innerHTML = steps.map((step, index) => {
@@ -78,7 +89,7 @@ function renderCities() {
     <td><span class="status-badge ${statusClass(city.poolStatus)}">${esc(poolLabel(city.poolStatus, city.poolExplanation))}</span></td>
     <td><span>${esc(city.station)}</span><small class="sub">${esc(city.timezone)}</small></td>
     <td>${esc(city.correlationGroup)}</td><td><b>${num(city.todayDecisions)}</b><small class="sub">通过 ${num(city.todayQualified)} · 计划 ${num(city.todayPlans)}</small></td>
-    <td><span class="disposition ${esc(city.latestDisposition || "")}">${esc(city.sourceHealth?.status === "DEGRADED" ? `采集受阻：${city.sourceHealth.code || city.sourceHealth.source}` : (city.latestDispositionLabel || dispositionLabel(city.latestDisposition)))}</span><small class="sub" title="${esc(city.sourceHealth?.status === "DEGRADED" ? city.sourceHealth.message : (city.primaryBlockerExplanation?.condition || city.primaryBlocker || ""))}">${esc(city.sourceHealth?.status === "DEGRADED" ? "非策略等待；上游数据源限流" : blockerLabel(city.primaryBlocker, city.primaryBlockerExplanation))}</small></td>
+    <td><span class="disposition ${esc(city.hasReservedPlan ? "EXECUTE_NOW" : (city.latestDisposition || ""))}">${esc(city.hasReservedPlan ? "纸面名额已占用" : (city.sourceHealth?.status === "DEGRADED" ? `采集受阻：${city.sourceHealth.code || city.sourceHealth.source}` : (city.latestDispositionLabel || dispositionLabel(city.latestDisposition))))}</span><small class="sub" title="${esc(city.sourceHealth?.status === "DEGRADED" ? city.sourceHealth.message : (city.primaryBlockerExplanation?.condition || city.primaryBlocker || ""))}">${esc(city.hasReservedPlan ? `已占用 ${city.todayPlans} 个名额；后续重估不撤销当日预留` : (city.sourceHealth?.status === "DEGRADED" ? "非策略等待；上游数据源限流" : blockerLabel(city.primaryBlocker, city.primaryBlockerExplanation)))}</small></td>
   </tr>`).join("") || `<tr class="empty-row"><td colspan="6">没有符合筛选条件的城市</td></tr>`;
   byId("cityRows").querySelectorAll("tr[data-city]").forEach(row => row.addEventListener("click", () => selectCity(row.dataset.city)));
 }
@@ -101,7 +112,7 @@ function selectCity(cityId) {
     <div class="detail-grid"><div><span>结算站</span><b>${esc(city.station)}</b></div><div><span>本地时区</span><b>${esc(city.timezone)}</b></div><div><span>主时区组</span><b>${esc(city.timezoneGroupLabel || city.timezoneGroup)}</b></div><div><span>气候子类</span><b>${esc(city.climateSubcategoryLabel || city.climateSubcategory)}</b></div><div><span>UTC 子类名额</span><b>${num(city.climateSubcategoryUsage?.plansReserved)} / 1</b></div><div><span>UTC 全局名额</span><b>${num(payload.paperRisk?.globalUsage?.plansReserved)} / ${num(payload.paperRisk?.globalUsage?.maxPlans)}</b></div><div><span>训练日</span><b>${num(m.training_days)}</b></div><div><span>未触碰评估日</span><b>${num(m.untouched_days)}</b></div><div><span>影子候选</span><b>${num(m.executable_candidates)}</b></div><div><span>今日策略通过</span><b>${num(city.todayQualified)}</b></div></div>
     <div class="detail-note"><b>UTC 纸面风控：</b>${esc(city.climateSubcategoryUsage?.reason || "每个气候子类当日最多一个计划。")} 当前子类预留 ${num(city.climateSubcategoryUsage?.plansReserved)} 个；全局新增风险 ${num(payload.paperRisk?.globalUsage?.riskReservedU, 2)} / ${num(payload.paperRisk?.globalUsage?.maxDailyRiskU, 0)}U。</div>
     <div class="evidence"><h4>城市晋级证据</h4>${evidenceHtml}</div>
-    <div class="detail-note">${city.primaryBlocker ? `<b>当前主要阻断：${esc(blockerLabel(city.primaryBlocker, city.primaryBlockerExplanation))}</b><br>${esc(city.primaryBlockerExplanation?.description || "")}<br><small>判定：${esc(city.primaryBlockerExplanation?.condition || city.primaryBlocker)}｜解除：${esc(city.primaryBlockerExplanation?.recovery || "等待重新评估")}</small>` : city.latestDisposition ? `最新决策：${esc(city.latestDispositionLabel || dispositionLabel(city.latestDisposition))} · ${shortTime(city.latestDecisionAt)}` : `${esc(city.poolExplanation?.description || "尚无该城市今日决策。采集资格不等于交易资格。")}`}</div>`;
+    <div class="detail-note">${city.hasReservedPlan ? `<b>今日纸面名额已占用：${num(city.todayPlans)} 个</b><br>该城市已有最终纸面计划；之后因全局名额已满产生的阻断重估不会覆盖原计划。` : city.primaryBlocker ? `<b>当前主要阻断：${esc(blockerLabel(city.primaryBlocker, city.primaryBlockerExplanation))}</b><br>${esc(city.primaryBlockerExplanation?.description || "")}<br><small>判定：${esc(city.primaryBlockerExplanation?.condition || city.primaryBlocker)}｜解除：${esc(city.primaryBlockerExplanation?.recovery || "等待重新评估")}</small>` : city.latestDisposition ? `最新决策：${esc(city.latestDispositionLabel || dispositionLabel(city.latestDisposition))} · ${shortTime(city.latestDecisionAt)}` : `${esc(city.poolExplanation?.description || "尚无该城市今日决策。采集资格不等于交易资格。")}`}</div>`;
   renderLinkedPanels();
 }
 
@@ -163,7 +174,7 @@ function renderBlockers(blockers) {
 
 function render(data) {
   payload = data;
-  renderSummary(data); renderAlerts(data.alerts || []); renderFunnel(data.funnel); renderPools(data.pools);
+  renderSummary(data); renderAlerts(data.alerts || []); renderReservedPlans(data.reservedPlans || [], data.paperRisk); renderFunnel(data.funnel); renderPools(data.pools);
   if (selectedCityId && !data.cities.some(city => city.cityId === selectedCityId)) selectedCityId = null;
   renderCities(); renderLinkedPanels();
 }

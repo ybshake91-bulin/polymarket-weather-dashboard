@@ -44,13 +44,24 @@ function renderAlerts(alerts) {
 
 function renderReservedPlans(plans, paperRisk) {
   const maximum = paperRisk?.globalUsage?.maxPlans;
-  byId("slotUsage").textContent = `${num(plans.length)} / ${num(maximum)} 名额已占用 · UTC ${esc(paperRisk?.reservationDate)}`;
-  byId("reservedPlanGrid").innerHTML = plans.map(plan => `<article class="slot-card">
-    <div class="slot-number">${num(plan.slot)}</div>
-    <div><b>${esc(plan.cityId)}</b><small>${esc(plan.contractDate)} · ${esc(plan.executionStyle)}</small></div>
-    <div><strong>${esc((plan.labels || []).join(" + ") || "—")}</strong><small>${esc(plan.strategyAction)} · ${num(plan.requestedStake, 2)} U</small></div>
-    <span class="status-badge status-SHADOW_ELIGIBLE">纸面名额已占用</span>
-  </article>`).join("") || `<div class="empty-detail slot-empty"><p>今日尚无纸面计划占用名额</p></div>`;
+  const rosters = paperRisk?.slotRosters || [];
+  const occupied = rosters.flatMap(group => group.slots || []).filter(slot => slot.state === "OCCUPIED").length;
+  byId("slotUsage").textContent = `${num(occupied)} 个名额已占用 · 按合约本地日期分组`;
+  byId("reservedPlanGrid").innerHTML = rosters.map(group => `<section class="slot-date-group">
+    <h3>合约日 ${esc(group.contractDate)} <small>${(group.slots || []).filter(s => s.state === "OCCUPIED").length} / ${num(maximum)}</small></h3>
+    <div class="slot-grid">${(group.slots || []).map(slot => {
+      const r = slot.reservation;
+      const decision = r ? (payload?.decisions || []).find(d => d.decisionId === r.decisionId) : null;
+      const window = decision?.decisionWindow || {};
+      return `<article class="slot-card ${r ? "occupied" : "empty"}">
+        <div class="slot-number">${num(slot.order)}</div>
+        <div><b>${esc(slot.displayName)}</b><small>${esc(slot.slotId)} · ${esc(slot.slotType)} · 参考 ${num(slot.referenceStakeU)}U</small></div>
+        ${r ? `<div><strong>${esc(r.cityId)} · ${esc(r.conditionId)}</strong><small>${esc(r.contractDate)} · ${esc(r.decisionId)}</small></div>
+          <div class="slot-facts"><small>计划 ${esc(r.planId)}</small><small>清单 ${esc(r.manifestHash)}</small><small>仓位 ${num(r.requestedStakeU,2)}U · 实际风险 ${num(r.worstCaseRiskU,2)}U</small><small>窗口 ${esc(window.stage || "—")} / ${esc(window.status || "—")}</small></div>
+          <span class="status-badge status-SHADOW_ELIGIBLE">已分配</span>` : `<div><strong>空闲</strong><small>等待符合既有策略与风控的计划</small></div><span class="status-badge">未分配</span>`}
+      </article>`;
+    }).join("")}</div>
+  </section>`).join("") || `<div class="empty-detail slot-empty"><p>等待名额目录</p></div>`;
 }
 
 function renderFunnel(funnel) {
@@ -89,7 +100,7 @@ function renderCities() {
     <td><span class="status-badge ${statusClass(city.poolStatus)}">${esc(poolLabel(city.poolStatus, city.poolExplanation))}</span></td>
     <td><span>${esc(city.station)}</span><small class="sub">${esc(city.timezone)}</small></td>
     <td>${esc(city.correlationGroup)}</td><td><b>${num(city.todayDecisions)}</b><small class="sub">通过 ${num(city.todayQualified)} · 计划 ${num(city.todayPlans)}</small></td>
-    <td><span class="disposition ${esc(city.hasReservedPlan ? "EXECUTE_NOW" : (city.latestDisposition || ""))}">${esc(city.hasReservedPlan ? "纸面名额已占用" : (city.sourceHealth?.status === "DEGRADED" ? `采集受阻：${city.sourceHealth.code || city.sourceHealth.source}` : (city.latestDispositionLabel || dispositionLabel(city.latestDisposition))))}</span><small class="sub" title="${esc(city.sourceHealth?.status === "DEGRADED" ? city.sourceHealth.message : (city.primaryBlockerExplanation?.condition || city.primaryBlocker || ""))}">${esc(city.hasReservedPlan ? `已占用 ${city.todayPlans} 个名额；后续重估不撤销当日预留` : (city.sourceHealth?.status === "DEGRADED" ? "非策略等待；上游数据源限流" : blockerLabel(city.primaryBlocker, city.primaryBlockerExplanation)))}</small></td>
+    <td><div class="dimension-badges"><span class="status-badge ${statusClass(city.poolStatus)}">治理：${esc(poolLabel(city.poolStatus, city.poolExplanation))}</span><span class="status-badge">窗口：${esc(city.window?.stage || "未评估")}</span><span class="disposition ${esc(city.latestDisposition || "")}">${esc(city.operationalStatus?.label || "等待评估")}</span></div><small class="sub">${esc(city.latestEvaluation?.blocker ? blockerLabel(city.latestEvaluation.blocker, city.latestEvaluation.blockerExplanation) : "无评估阻断")} · 下次 ${shortTime(city.window?.nextCheckAt || city.window?.nextTransitionAt)}</small></td>
   </tr>`).join("") || `<tr class="empty-row"><td colspan="6">没有符合筛选条件的城市</td></tr>`;
   byId("cityRows").querySelectorAll("tr[data-city]").forEach(row => row.addEventListener("click", () => selectCity(row.dataset.city)));
 }
@@ -112,7 +123,7 @@ function selectCity(cityId) {
     <div class="detail-grid"><div><span>结算站</span><b>${esc(city.station)}</b></div><div><span>本地时区</span><b>${esc(city.timezone)}</b></div><div><span>主时区组</span><b>${esc(city.timezoneGroupLabel || city.timezoneGroup)}</b></div><div><span>气候子类</span><b>${esc(city.climateSubcategoryLabel || city.climateSubcategory)}</b></div><div><span>UTC 子类名额</span><b>${num(city.climateSubcategoryUsage?.plansReserved)} / 1</b></div><div><span>UTC 全局名额</span><b>${num(payload.paperRisk?.globalUsage?.plansReserved)} / ${num(payload.paperRisk?.globalUsage?.maxPlans)}</b></div><div><span>训练日</span><b>${num(m.training_days)}</b></div><div><span>未触碰评估日</span><b>${num(m.untouched_days)}</b></div><div><span>影子候选</span><b>${num(m.executable_candidates)}</b></div><div><span>今日策略通过</span><b>${num(city.todayQualified)}</b></div></div>
     <div class="detail-note"><b>UTC 纸面风控：</b>${esc(city.climateSubcategoryUsage?.reason || "每个气候子类当日最多一个计划。")} 当前子类预留 ${num(city.climateSubcategoryUsage?.plansReserved)} 个；全局新增风险 ${num(payload.paperRisk?.globalUsage?.riskReservedU, 2)} / ${num(payload.paperRisk?.globalUsage?.maxDailyRiskU, 0)}U。</div>
     <div class="evidence"><h4>城市晋级证据</h4>${evidenceHtml}</div>
-    <div class="detail-note">${city.hasReservedPlan ? `<b>今日纸面名额已占用：${num(city.todayPlans)} 个</b><br>该城市已有最终纸面计划；之后因全局名额已满产生的阻断重估不会覆盖原计划。` : city.primaryBlocker ? `<b>当前主要阻断：${esc(blockerLabel(city.primaryBlocker, city.primaryBlockerExplanation))}</b><br>${esc(city.primaryBlockerExplanation?.description || "")}<br><small>判定：${esc(city.primaryBlockerExplanation?.condition || city.primaryBlocker)}｜解除：${esc(city.primaryBlockerExplanation?.recovery || "等待重新评估")}</small>` : city.latestDisposition ? `最新决策：${esc(city.latestDispositionLabel || dispositionLabel(city.latestDisposition))} · ${shortTime(city.latestDecisionAt)}` : `${esc(city.poolExplanation?.description || "尚无该城市今日决策。采集资格不等于交易资格。")}`}</div>`;
+    <div class="detail-note">${city.hasReservedPlan ? `<b>纸面计划已预留：业务日 ${num(city.todayPlans)} 个 · 相关合约 ${num(city.activeReservations?.length)} 个</b><br>之后的阻断重估不会覆盖原计划。${city.latestEvaluation?.blocker ? `<br><b>当前评估阻断：${esc(blockerLabel(city.latestEvaluation.blocker, city.latestEvaluation.blockerExplanation))}</b>` : ""}` : city.latestEvaluation?.blocker ? `<b>当前主要阻断：${esc(blockerLabel(city.latestEvaluation.blocker, city.latestEvaluation.blockerExplanation))}</b><br>${esc(city.latestEvaluation.blockerExplanation?.description || "")}<br><small>判定：${esc(city.latestEvaluation.blockerExplanation?.condition || city.latestEvaluation.blocker)}｜解除：${esc(city.latestEvaluation.blockerExplanation?.recovery || "等待重新评估")}</small>` : city.latestDisposition ? `最新决策：${esc(city.latestDispositionLabel || dispositionLabel(city.latestDisposition))} · ${shortTime(city.latestDecisionAt)}` : `${esc(city.poolExplanation?.description || "尚无该城市今日决策。采集资格不等于交易资格。")}`}</div>`;
   renderLinkedPanels();
 }
 
@@ -179,31 +190,62 @@ function render(data) {
   renderCities(); renderLinkedPanels();
 }
 
-async function refresh() {
+function isDashboardPayload(data) {
+  const record = value => value !== null && typeof value === "object" && !Array.isArray(value);
+  return record(data)
+    && record(data.summary)
+    && record(data.health)
+    && record(data.funnel)
+    && record(data.pools)
+    && Array.isArray(data.cities)
+    && Array.isArray(data.decisions)
+    && Array.isArray(data.orders);
+}
+
+async function fetchDashboardJson(url) {
+  const response = await fetch(url, {cache:"no-store"});
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const contentType = response.headers?.get("content-type") || "";
+  if (!/^application\/(?:json\b|[^;]+\+json\b)/i.test(contentType)) {
+    throw new Error(`Expected JSON but received ${contentType || "no Content-Type"}`);
+  }
+  const data = await response.json();
+  if (!isDashboardPayload(data)) throw new Error("Invalid dashboard payload shape");
+  return data;
+}
+
+async function loadDashboardPayload() {
+  // Prefer the canonical snapshot so a built/offline site never needs an API.
+  const staticSnapshot = `./data/dashboard-primary.json?v=${Date.now()}`;
   try {
-    const staticHost = window.location.hostname.endsWith("github.io");
-    // GitHub Pages' CDN may retain data/dashboard.json despite no-store. A
-    // cache-busting query makes the page always request the latest snapshot.
-    const staticSnapshot = `./data/dashboard-primary.json?v=${Date.now()}`;
-    let response = await fetch(staticHost ? staticSnapshot : "/api/dashboard", {cache:"no-store"});
-    if (!response.ok) response = await fetch(staticSnapshot, {cache:"no-store"});
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    render(await response.json());
-  } catch (error) {
+    return await fetchDashboardJson(staticSnapshot);
+  } catch (staticError) {
     try {
-      const response = await fetch(`./data/dashboard-primary.json?v=${Date.now()}`, {cache:"no-store"});
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      render(await response.json());
-    } catch (_) {
-      byId("healthLabel").textContent = "OFFLINE";
-      byId("freshness").textContent = error.message;
-      byId("systemState").classList.remove("online");
+      return await fetchDashboardJson("/api/dashboard");
+    } catch (apiError) {
+      throw new Error(`Dashboard API failed: ${apiError.message} (static snapshot: ${staticError.message})`);
     }
   }
 }
 
-byId("citySearch").addEventListener("input", renderCities);
-byId("poolFilter").addEventListener("change", renderCities);
-byId("clearCityFilter").addEventListener("click", clearCityFilter);
-setInterval(() => byId("clock").textContent = new Date().toLocaleTimeString("zh-CN", {hour12:false}), 1000);
-refresh(); setInterval(refresh, 15000);
+async function refresh() {
+  try {
+    render(await loadDashboardPayload());
+  } catch (error) {
+    byId("healthLabel").textContent = "OFFLINE";
+    byId("freshness").textContent = error.message;
+    byId("systemState").classList.remove("online");
+  }
+}
+
+if (typeof document !== "undefined") {
+  byId("citySearch").addEventListener("input", renderCities);
+  byId("poolFilter").addEventListener("change", renderCities);
+  byId("clearCityFilter").addEventListener("click", clearCityFilter);
+  setInterval(() => byId("clock").textContent = new Date().toLocaleTimeString("zh-CN", {hour12:false}), 1000);
+  refresh(); setInterval(refresh, 15000);
+}
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = {fetchDashboardJson, isDashboardPayload, loadDashboardPayload, refresh};
+}

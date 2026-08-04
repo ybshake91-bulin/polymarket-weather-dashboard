@@ -42,23 +42,39 @@ function renderAlerts(alerts) {
   byId("alerts").innerHTML = alerts.map(a => `<div class="alert ${esc(a.level)}"><b>${esc(a.code)}</b><span>${esc(a.message)}</span></div>`).join("");
 }
 
-function renderReservedPlans(plans, paperRisk) {
+function compactId(value) {
+  const text = String(value || "—");
+  return text.length > 20 ? `${text.slice(0, 10)}…${text.slice(-6)}` : text;
+}
+
+function renderReservedPlans(plans, paperRisk, decisions = payload?.decisions || []) {
   const maximum = paperRisk?.globalUsage?.maxPlans;
   const rosters = paperRisk?.slotRosters || [];
   const occupied = rosters.flatMap(group => group.slots || []).filter(slot => slot.state === "OCCUPIED").length;
+  const plansById = new Map((plans || []).map(plan => [plan.planId, plan]));
   byId("slotUsage").textContent = `${num(occupied)} 个名额已占用 · 按合约本地日期分组`;
   byId("reservedPlanGrid").innerHTML = rosters.map(group => `<section class="slot-date-group">
     <h3>合约日 ${esc(group.contractDate)} <small>${(group.slots || []).filter(s => s.state === "OCCUPIED").length} / ${num(maximum)}</small></h3>
     <div class="slot-grid">${(group.slots || []).map(slot => {
       const r = slot.reservation;
-      const decision = r ? (payload?.decisions || []).find(d => d.decisionId === r.decisionId) : null;
+      const plan = r ? plansById.get(r.planId) : null;
+      const decision = r ? decisions.find(d => d.decisionId === r.decisionId) : null;
       const window = decision?.decisionWindow || {};
+      const labels = (plan?.labels || decision?.labels || []).join(" + ") || "档位待同步";
+      const action = plan?.strategyAction || decision?.strategyAction || "策略待同步";
       return `<article class="slot-card ${r ? "occupied" : "empty"}">
-        <div class="slot-number">${num(slot.order)}</div>
-        <div><b>${esc(slot.displayName)}</b><small>${esc(slot.slotId)} · ${esc(slot.slotType)} · 参考 ${num(slot.referenceStakeU)}U</small></div>
-        ${r ? `<div><strong>${esc(r.cityId)} · ${esc(r.conditionId)}</strong><small>${esc(r.contractDate)} · ${esc(r.decisionId)}</small></div>
-          <div class="slot-facts"><small>计划 ${esc(r.planId)}</small><small>清单 ${esc(r.manifestHash)}</small><small>仓位 ${num(r.requestedStakeU,2)}U · 实际风险 ${num(r.worstCaseRiskU,2)}U</small><small>窗口 ${esc(window.stage || "—")} / ${esc(window.status || "—")}</small></div>
-          <span class="status-badge status-SHADOW_ELIGIBLE">已分配</span>` : `<div><strong>空闲</strong><small>等待符合既有策略与风控的计划</small></div><span class="status-badge">未分配</span>`}
+        <div class="slot-card-head">
+          <div class="slot-number">${num(slot.order)}</div>
+          <div class="slot-title"><b>${esc(slot.displayName)}</b><small>${esc(slot.slotType)} · 参考 ${num(slot.referenceStakeU)}U</small></div>
+          <span class="status-badge ${r ? "status-SHADOW_ELIGIBLE" : ""}">${r ? "已分配" : "未分配"}</span>
+        </div>
+        ${r ? `<div class="slot-main">
+            <strong>${esc(r.cityId)}</strong>
+            <div class="slot-target" title="${esc(labels)}">${esc(labels)}</div>
+            <small>${esc(action)} · 合约日 ${esc(r.contractDate)}</small>
+          </div>
+          <div class="slot-stats"><div><small>计划仓位</small><b>${num(r.requestedStakeU,2)}U</b></div><div><small>实际风险</small><b>${num(r.worstCaseRiskU,2)}U</b></div></div>
+          <div class="slot-ids"><small title="${esc(r.decisionId)}">决策 ${esc(compactId(r.decisionId))}</small><small title="${esc(r.planId)}">计划 ${esc(compactId(r.planId))}</small>${window.stage ? `<small>窗口 ${esc(window.stage)} / ${esc(window.status || "—")}</small>` : ""}</div>` : `<div class="slot-main"><strong>空闲</strong><small>等待符合既有策略与风控的计划</small></div>`}
       </article>`;
     }).join("")}</div>
   </section>`).join("") || `<div class="empty-detail slot-empty"><p>等待名额目录</p></div>`;
@@ -247,5 +263,5 @@ if (typeof document !== "undefined") {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = {fetchDashboardJson, isDashboardPayload, loadDashboardPayload, refresh};
+  module.exports = {fetchDashboardJson, isDashboardPayload, loadDashboardPayload, refresh, renderReservedPlans};
 }

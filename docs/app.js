@@ -11,10 +11,15 @@ const freshness = seconds => seconds == null ? "等待首条运行数据" : seco
 const statusClass = status => `status-${esc(status)}`;
 const poolLabel = (status, explanation) => explanation?.label || ({COLLECT_FULL:"完整采集",COLLECT_LITE:"轻量采集",MODEL_ELIGIBLE:"模型合格",SHADOW_ELIGIBLE:"影子合格",CASH_ELIGIBLE:"现金合格",BLOCKED_RULE:"规则阻断",BLOCKED_DATA:"数据阻断",BLOCKED_SKILL:"模型阻断",BLOCKED_LIQUIDITY:"流动性阻断",SUSPENDED_RISK:"风险暂停",UNIVERSE:"候选全集"}[status] || status);
 const dispositionLabel = status => ({EXECUTE_NOW:"可立即执行",POST_MAKER:"可挂限价单",WAIT:"等待更新",SKIP:"暂不操作",HOLD:"持有观察",REDUCE:"减仓",EXIT:"退出",REBALANCE:"调仓",BLOCKED:"被硬性阻断"}[status] || status || "等待数据");
+const windowStageLabel = stage => ({BEFORE_WATCH:"观察前",WATCHING:"观察中",DECISION_OPEN:"决策打开(非正式)",TARGET_WINDOW:"正式决策窗口",RISK_ONLY:"仅风控",CLOSED:"已关闭",BLOCKED:"阻断"}[stage] || stage || "未评估");
 const blockerLabel = (code, explanation) => explanation?.label || ({DAILY_NEW_RISK_LIMIT:"今日新增风险额度已满",DAILY_PACKAGE_COUNT_LIMIT:"今日计划名额已满",CLIMATE_SUBCATEGORY_DAILY_PLAN_LIMIT:"气候子类当日计划已占用",CITY_NOT_SHADOW_ELIGIBLE:"城市未获策略准入",CITY_BLOCKED_RULE:"城市规则禁止",WEATHER_DATA_STALE:"天气数据已过期",MARKET_BOOK_STALE:"盘口快照已过期",MARKET_BOOK_SEQUENCE_GAP:"盘口序列不连续",MARKET_BUCKET_MAPPING_MISMATCH:"合约档位映射异常",CONTRACT_RULES_UNVERIFIED:"合约规则未验证",VALUATION_INPUT_INVALID:"估值输入不合法",RISK_LIMIT_BLOCKED:"风险规则阻断",NO_POSITIVE_EXECUTABLE_ACTION:"没有可成交的正期望机会"}[code] || code || "无阻断");
 
 function renderSummary(data) {
   const s = data.summary;
+  const paperRisk = data.paperRisk || {};
+  const maxPlans = paperRisk.globalUsage?.maxPlans ?? "—";
+  const rosters = paperRisk.slotRosters || [];
+  const occupied = rosters.flatMap(group => group.slots || []).filter(slot => slot.state === "OCCUPIED").length;
   byId("metricCities").textContent = num(s.cities);
   // 副标题按实际非零城市池分布展示，保证各池加总 = 治理城市总数；
   // 不能只写死 完整/轻量/阻断 三类，否则会漏掉 影子准入 等当前主池。
@@ -24,9 +29,12 @@ function renderSummary(data) {
     .map(([status, count]) => `${poolLabel(status)} ${num(count)}`);
   byId("metricPools").textContent = poolParts.length ? poolParts.join(" · ") : "等待城市注册表";
   byId("metricDecisions").textContent = num(s.todayDecisions);
-  byId("metricQualified").textContent = `策略通过 ${s.strategyQualified}`;
+  // 策略通过 = 最新一轮评估快照中仍符合策略的城市数；名额满后会下降，属正常。
+  byId("metricQualified").textContent = `策略通过 ${s.strategyQualified}（最新评估）· 实盘授权 ${s.executionAuthorized}`;
+  // 今日生成计划 vs 台账名额是两个口径：前者是业务日内生成的计划记录，
+  // 后者是持久化占用的纸面名额（跨业务日生成的计划也会计入台账）。
   byId("metricPlans").textContent = num(s.plannedOrders);
-  byId("metricAuthorized").textContent = `实盘授权 ${s.executionAuthorized}`;
+  byId("metricAuthorized").textContent = `台账名额 ${occupied} / ${maxPlans}${s.executionAuthorized ? ` · 实盘授权 ${s.executionAuthorized}` : ""}`;
   byId("metricFillRate").textContent = pct(s.fillRate);
   byId("metricFilled").textContent = `成交 ${s.filledOrders} / 提交 ${s.submittedOrders}`;
   byId("metricRisk").textContent = money(s.openRiskU);

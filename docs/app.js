@@ -113,14 +113,22 @@ function renderPools(pools) {
   const selected = select.value;
   select.innerHTML = `<option value="ALL">全部城市池</option>` + entries.map(([status]) => `<option value="${esc(status)}">${esc(poolLabel(status))}</option>`).join("");
   if ([...select.options].some(option => option.value === selected)) select.value = selected;
+  // 主时区组筛选：从城市数据动态收集唯一组，保留当前选中值
+  const tzSelect = byId("tzFilter");
+  const tzSelected = tzSelect.value;
+  const tzGroups = [...new Set((payload.cities || []).map(c => c.timezoneGroup || c.correlationGroup || "").filter(Boolean))].sort();
+  tzSelect.innerHTML = `<option value="ALL">全部主时区组</option>` + tzGroups.map(group => `<option value="${esc(group)}">${esc((payload.cities.find(c => (c.timezoneGroup || c.correlationGroup) === group) || {}).timezoneGroupLabel || group)}</option>`).join("");
+  if ([...tzSelect.options].some(option => option.value === tzSelected)) tzSelect.value = tzSelected;
 }
 
 function cityRows() {
   const query = byId("citySearch").value.trim().toLowerCase();
   const pool = byId("poolFilter").value;
+  const tz = byId("tzFilter").value;
   return payload.cities.filter(city => {
-    const text = `${city.name} ${city.cityId} ${city.station || ""} ${city.timezoneGroup || city.correlationGroup}`.toLowerCase();
-    return (!query || text.includes(query)) && (pool === "ALL" || city.poolStatus === pool);
+    const tzGroup = city.timezoneGroup || city.correlationGroup || "";
+    const text = `${city.name} ${city.cityId} ${city.station || ""} ${tzGroup}`.toLowerCase();
+    return (!query || text.includes(query)) && (pool === "ALL" || city.poolStatus === pool) && (tz === "ALL" || tzGroup === tz);
   });
 }
 
@@ -273,6 +281,7 @@ async function refresh() {
 if (typeof document !== "undefined") {
   byId("citySearch").addEventListener("input", renderCities);
   byId("poolFilter").addEventListener("change", renderCities);
+  byId("tzFilter").addEventListener("change", renderCities);
   byId("clearCityFilter").addEventListener("click", clearCityFilter);
   setInterval(() => byId("clock").textContent = new Date().toLocaleTimeString("zh-CN", {hour12:false}), 1000);
   refresh(); setInterval(refresh, 15000);

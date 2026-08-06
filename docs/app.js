@@ -41,6 +41,12 @@ function renderSummary(data) {
   byId("metricStake").textContent = `今日成交额 ${num(s.filledStakeU, 2)} U`;
   byId("metricPnl").textContent = money(s.realizedPnlU);
   byId("metricPnl").className = Number(s.realizedPnlU) > 0 ? "positive" : Number(s.realizedPnlU) < 0 ? "negative" : "";
+  // 预期已实现 PnL：按完整成交率折算的纸面计划期望收益，与真实成交口径
+  // 分开展示，避免把建模收益冒充为真实账户回报。
+  if (s.expectedRealizedPnlU != null && Number(s.expectedRealizedPnlU) !== 0) {
+    const expected = Number(s.expectedRealizedPnlU);
+    byId("metricPnl").textContent = `${money(s.realizedPnlU)}（预期 ${money(expected)}）`;
+  }
   byId("businessDate").textContent = `业务日期 / ${data.businessDate}`;
   byId("modePill").textContent = data.health.mode;
   byId("livePill").textContent = data.health.liveEnabled ? "影子运行 · 实盘开启" : "影子运行 · 实盘关闭";
@@ -88,7 +94,7 @@ function renderReservedPlans(plans, paperRisk, decisions = payload?.decisions ||
             <div class="slot-target" title="${esc(labels)}">${esc(labels)}</div>
             <small>${esc(action)} · 合约日 ${esc(r.contractDate)}</small>
           </div>
-          <div class="slot-stats"><div><small>计划仓位</small><b>${num(r.requestedStakeU,2)}U</b></div><div><small>实际风险</small><b>${num(r.worstCaseRiskU,2)}U</b></div></div>
+          <div class="slot-stats"><div><small>计划仓位</small><b>${num(r.requestedStakeU,2)}U</b></div><div><small>实际风险</small><b>${num(r.worstCaseRiskU,2)}U</b></div>${r.expectedFillRatio != null ? `<div><small>预期成交率</small><b>${pct(r.expectedFillRatio)}</b></div>` : ""}</div>
           <div class="slot-ids"><small title="${esc(r.decisionId)}">决策 ${esc(compactId(r.decisionId))}</small><small title="${esc(r.planId)}">计划 ${esc(compactId(r.planId))}</small>${window.stage ? `<small>窗口 ${esc(window.stage)} / ${esc(window.status || "—")}</small>` : ""}</div>` : `<div class="slot-main"><strong>空闲</strong><small>等待符合既有策略与风控的计划</small></div>`}
       </article>`;
     }).join("")}</div>

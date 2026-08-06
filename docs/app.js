@@ -16,7 +16,13 @@ const blockerLabel = (code, explanation) => explanation?.label || ({DAILY_NEW_RI
 function renderSummary(data) {
   const s = data.summary;
   byId("metricCities").textContent = num(s.cities);
-  byId("metricPools").textContent = `完整 ${s.fullCollection} · 轻量 ${s.liteCollection} · 阻断 ${s.blockedCities}`;
+  // 副标题按实际非零城市池分布展示，保证各池加总 = 治理城市总数；
+  // 不能只写死 完整/轻量/阻断 三类，否则会漏掉 影子准入 等当前主池。
+  const poolParts = Object.entries(data.pools || {})
+    .filter(([, count]) => Number(count) > 0)
+    .sort((a, b) => Number(b[1]) - Number(a[1]))
+    .map(([status, count]) => `${poolLabel(status)} ${num(count)}`);
+  byId("metricPools").textContent = poolParts.length ? poolParts.join(" · ") : "等待城市注册表";
   byId("metricDecisions").textContent = num(s.todayDecisions);
   byId("metricQualified").textContent = `策略通过 ${s.strategyQualified}`;
   byId("metricPlans").textContent = num(s.plannedOrders);

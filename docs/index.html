@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
   <title>WAP V4 天气交易监控</title>
-  <link rel="stylesheet" href="./styles.css?v=20260806-overhaul">
+  <link rel="stylesheet" href="./styles.css?v=20260806-shadow">
 </head>
 <body>
   <div class="atmosphere"></div>
@@ -33,7 +33,7 @@
       <div class="mast-meta">
         <span id="businessDate">—</span>
         <strong id="clock">--:--:--</strong>
-        <div><span class="mode-pill" id="modePill">PAPER_ONLY</span><span class="safe-pill" id="livePill">实盘关闭</span></div>
+        <div><span class="mode-pill" id="modePill">PAPER_ONLY</span><span class="safe-pill" id="livePill">影子运行 · 实盘关闭</span></div>
       </div>
     </section>
 
@@ -75,7 +75,7 @@
       <div class="city-layout">
         <div class="table-wrap city-table-wrap">
           <table class="data-table city-table">
-            <thead><tr><th>城市</th><th>资格池</th><th>站点 / 时区</th><th>相关组</th><th>今日决策</th><th>最新状态</th></tr></thead>
+            <thead><tr><th>城市</th><th>资格池</th><th>站点 / 时区</th><th>主时区组</th><th>今日决策</th><th>最新状态</th></tr></thead>
             <tbody id="cityRows"></tbody>
           </table>
         </div>
@@ -88,7 +88,7 @@
     <section class="panel" id="decisions">
       <header class="panel-head">
         <div><p class="kicker">DECISION ENVELOPES</p><h2>当日决策</h2></div>
-        <div class="linked-controls"><span class="legend"><span class="dot qualified"></span>策略通过 <span class="dot authorized"></span>实盘授权</span><span class="filter-chip" id="linkedFilterLabel">当前筛选：全部城市</span><button class="filter-clear" id="clearCityFilter" type="button" hidden>清除城市筛选</button></div>
+        <div class="linked-controls"><span class="legend"><span class="dot qualified"></span>策略通过 <span class="dot authorized"></span>影子授权</span><span class="filter-chip" id="linkedFilterLabel">当前筛选：全部城市</span><button class="filter-clear" id="clearCityFilter" type="button" hidden>清除城市筛选</button></div>
       </header>
       <div class="table-wrap">
         <table class="data-table">
@@ -99,7 +99,7 @@
     </section>
 
     <section class="panel" id="orders">
-      <header class="panel-head"><div><p class="kicker">EXECUTION PLANS</p><h2>可执行订单</h2></div><span class="panel-note">订单计划 ≠ 实盘授权</span></header>
+      <header class="panel-head"><div><p class="kicker">EXECUTION PLANS</p><h2>可执行订单</h2></div><span class="panel-note">与纸面决策名额同源 · 影子运行</span></header>
       <div class="order-grid" id="orderGrid"></div>
     </section>
 
@@ -111,6 +111,6 @@
 
     <footer><span>WAP V4 · READ-ONLY MONITOR</span><span id="generatedAt">—</span></footer>
   </main>
-  <script src="./app.js?v=20260806-overhaul" defer></script>
+  <script src="./app.js?v=20260806-shadow" defer></script>
 </body>
 </html>

@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="dark">
   <title>WAP V4 天气交易监控</title>
-  <link rel="stylesheet" href="./styles.css?v=20260806-shadow">
+  <link rel="stylesheet" href="./styles.css?v=20260806-tzfilter">
 </head>
 <body>
   <div class="atmosphere"></div>
@@ -68,8 +68,9 @@
       <header class="panel-head city-head">
         <div><p class="kicker">CITY INTELLIGENCE</p><h2>城市分类与分析</h2></div>
         <div class="filters">
-          <input id="citySearch" type="search" placeholder="搜索城市、站点或相关组" autocomplete="off">
+          <input id="citySearch" type="search" placeholder="搜索城市、站点或主时区组" autocomplete="off">
           <select id="poolFilter"><option value="ALL">全部城市池</option></select>
+          <select id="tzFilter"><option value="ALL">全部主时区组</option></select>
         </div>
       </header>
       <div class="city-layout">
@@ -111,6 +112,6 @@
 
     <footer><span>WAP V4 · READ-ONLY MONITOR</span><span id="generatedAt">—</span></footer>
   </main>
-  <script src="./app.js?v=20260806-shadow" defer></script>
+  <script src="./app.js?v=20260806-tzfilter" defer></script>
 </body>
 </html>

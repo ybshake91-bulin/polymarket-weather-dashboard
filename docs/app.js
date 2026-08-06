@@ -30,12 +30,11 @@ function renderSummary(data) {
     .map(([status, count]) => `${poolLabel(status)} ${num(count)}`);
   byId("metricPools").textContent = poolParts.length ? poolParts.join(" · ") : "等待城市注册表";
   byId("metricDecisions").textContent = num(s.todayDecisions);
-  // 策略通过 = 最新一轮评估快照中仍符合策略的城市数；名额满后会下降，属正常。
-  byId("metricQualified").textContent = `策略通过 ${s.strategyQualified}（最新评估）· 实盘授权 ${s.executionAuthorized}`;
-  // 今日生成计划 vs 台账名额是两个口径：前者是业务日内生成的计划记录，
-  // 后者是持久化占用的纸面名额（跨业务日生成的计划也会计入台账）。
+  // 策略通过 = 今日所有评估中曾通过策略的唯一城市/合约数（累计口径，与漏斗一致）。
+  byId("metricQualified").textContent = `策略通过 ${s.strategyQualified}（今日累计）· 影子授权 ${s.executionAuthorized}`;
+  // 今日生成计划 = 今日评估中曾生成计划记录的唯一合约数；台账名额是持久化占用。
   byId("metricPlans").textContent = num(s.plannedOrders);
-  byId("metricAuthorized").textContent = `台账名额 ${occupied} / ${maxPlans}${s.executionAuthorized ? ` · 实盘授权 ${s.executionAuthorized}` : ""}`;
+  byId("metricAuthorized").textContent = `台账名额 ${occupied} / ${maxPlans}${s.executionAuthorized ? ` · 影子授权 ${s.executionAuthorized}` : ""}`;
   byId("metricFillRate").textContent = pct(s.fillRate);
   byId("metricFilled").textContent = `成交 ${s.filledOrders} / 提交 ${s.submittedOrders}`;
   byId("metricRisk").textContent = money(s.openRiskU);
@@ -44,7 +43,7 @@ function renderSummary(data) {
   byId("metricPnl").className = Number(s.realizedPnlU) > 0 ? "positive" : Number(s.realizedPnlU) < 0 ? "negative" : "";
   byId("businessDate").textContent = `业务日期 / ${data.businessDate}`;
   byId("modePill").textContent = data.health.mode;
-  byId("livePill").textContent = data.health.liveEnabled ? "实盘开启" : "实盘关闭";
+  byId("livePill").textContent = data.health.liveEnabled ? "影子运行 · 实盘开启" : "影子运行 · 实盘关闭";
   const pipeline = data.health.pipeline || {};
   const pipelineText = pipeline.status && pipeline.status !== "OK" ? ` · 数据链路 ${pipeline.status}${pipeline.error?.code ? ` (${pipeline.error.code})` : ""}` : "";
   byId("healthLabel").textContent = `${data.health.status}${pipelineText}`;
@@ -85,6 +84,7 @@ function renderReservedPlans(plans, paperRisk, decisions = payload?.decisions ||
         </div>
         ${r ? `<div class="slot-main">
             <strong>${esc(r.cityId)}</strong>
+            ${r.stillQualified ? `<span class="still-badge">策略仍有效</span>` : ""}
             <div class="slot-target" title="${esc(labels)}">${esc(labels)}</div>
             <small>${esc(action)} · 合约日 ${esc(r.contractDate)}</small>
           </div>
@@ -96,7 +96,7 @@ function renderReservedPlans(plans, paperRisk, decisions = payload?.decisions ||
 }
 
 function renderFunnel(funnel) {
-  const steps = [["决策重估",funnel.decisionEvents],["策略通过",funnel.strategyQualified],["生成计划",funnel.planned],["提交执行",funnel.submitted],["完整成交",funnel.filled]];
+  const steps = [["决策重估(今日唯一)",funnel.decisionEvents],["策略通过(累计)",funnel.strategyQualified],["生成计划(累计)",funnel.planned],["提交执行",funnel.submitted],["完整成交",funnel.filled]];
   byId("funnel").innerHTML = steps.map((step, index) => {
     const base = index ? Number(steps[index-1][1]) : Number(step[1]);
     const rate = index ? (base ? Number(step[1]) / base : 0) : 1;
@@ -119,7 +119,7 @@ function cityRows() {
   const query = byId("citySearch").value.trim().toLowerCase();
   const pool = byId("poolFilter").value;
   return payload.cities.filter(city => {
-    const text = `${city.name} ${city.cityId} ${city.station || ""} ${city.correlationGroup}`.toLowerCase();
+    const text = `${city.name} ${city.cityId} ${city.station || ""} ${city.timezoneGroup || city.correlationGroup}`.toLowerCase();
     return (!query || text.includes(query)) && (pool === "ALL" || city.poolStatus === pool);
   });
 }
@@ -130,7 +130,7 @@ function renderCities() {
     <td class="city-name"><b>${esc(city.name)}</b><small>${esc(city.cityId)}</small></td>
     <td><span class="status-badge ${statusClass(city.poolStatus)}">${esc(poolLabel(city.poolStatus, city.poolExplanation))}</span></td>
     <td><span>${esc(city.station)}</span><small class="sub">${esc(city.timezone)}</small></td>
-    <td>${esc(city.correlationGroup)}</td><td><b>${num(city.todayDecisions)}</b><small class="sub">通过 ${num(city.todayQualified)} · 计划 ${num(city.todayPlans)}</small></td>
+    <td>${esc(city.timezoneGroupLabel || city.timezoneGroup || city.correlationGroup)}</td><td><b>${num(city.todayDecisions)}</b><small class="sub">通过 ${num(city.todayQualified)} · 计划 ${num(city.todayPlans)}</small></td>
     <td><div class="dimension-badges"><span class="status-badge ${statusClass(city.poolStatus)}">治理：${esc(poolLabel(city.poolStatus, city.poolExplanation))}</span><span class="status-badge">窗口：${esc(windowStageLabel(city.window?.stage))}</span><span class="disposition ${esc(city.latestDisposition || "")}">${esc(city.operationalStatus?.label || "等待评估")}</span></div><small class="sub">${esc(city.latestEvaluation?.blocker ? blockerLabel(city.latestEvaluation.blocker, city.latestEvaluation.blockerExplanation) : "无评估阻断")} · 下次 ${shortTime(city.window?.nextCheckAt || city.window?.nextTransitionAt)}</small></td>
   </tr>`).join("") || `<tr class="empty-row"><td colspan="6">没有符合筛选条件的城市</td></tr>`;
   byId("cityRows").querySelectorAll("tr[data-city]").forEach(row => row.addEventListener("click", () => selectCity(row.dataset.city)));
@@ -150,9 +150,9 @@ function selectCity(cityId) {
     ["校准质量 (1-ECE)", m.ece == null ? null : Math.max(0,1-Number(m.ece)), v => pct(v)],
   ];
   const evidenceHtml = evidence.map(([label,value,format]) => `<div class="evidence-row"><div><span>${label}</span><b>${value == null ? "未采集" : format(value)}</b></div><div class="bar-track"><div class="bar-fill" style="width:${value == null ? 0 : Math.max(0,Math.min(1,value))*100}%"></div></div></div>`).join("");
-  byId("cityDetail").innerHTML = `<div class="detail-top"><div><h3>${esc(city.name)}</h3><p>${esc(city.cityId)} · ${esc(city.correlationGroup)}</p></div><span class="status-badge ${statusClass(city.poolStatus)}">${esc(poolLabel(city.poolStatus, city.poolExplanation))}</span></div>
-    <div class="detail-grid"><div><span>结算站</span><b>${esc(city.station)}</b></div><div><span>本地时区</span><b>${esc(city.timezone)}</b></div><div><span>主时区组</span><b>${esc(city.timezoneGroupLabel || city.timezoneGroup)}</b></div><div><span>气候子类</span><b>${esc(city.climateSubcategoryLabel || city.climateSubcategory)}</b></div><div><span>UTC 子类名额</span><b>${num(city.climateSubcategoryUsage?.plansReserved)} / 1</b></div><div><span>UTC 全局名额</span><b>${num(payload.paperRisk?.globalUsage?.plansReserved)} / ${num(payload.paperRisk?.globalUsage?.maxPlans)}</b></div><div><span>训练日</span><b>${num(m.training_days)}</b></div><div><span>未触碰评估日</span><b>${num(m.untouched_days)}</b></div><div><span>影子候选</span><b>${num(m.executable_candidates)}</b></div><div><span>今日策略通过</span><b>${num(city.todayQualified)}</b></div></div>
-    <div class="detail-note"><b>UTC 纸面风控：</b>${esc(city.climateSubcategoryUsage?.reason || "每个气候子类当日最多一个计划。")} 当前子类预留 ${num(city.climateSubcategoryUsage?.plansReserved)} 个；全局新增风险 ${num(payload.paperRisk?.globalUsage?.riskReservedU, 2)} / ${num(payload.paperRisk?.globalUsage?.maxDailyRiskU, 0)}U。</div>
+  byId("cityDetail").innerHTML = `<div class="detail-top"><div><h3>${esc(city.name)}</h3><p>${esc(city.cityId)} · ${esc(city.timezoneGroupLabel || city.timezoneGroup || city.correlationGroup)}</p></div><span class="status-badge ${statusClass(city.poolStatus)}">${esc(poolLabel(city.poolStatus, city.poolExplanation))}</span></div>
+    <div class="detail-grid"><div><span>结算站</span><b>${esc(city.station)}</b></div><div><span>本地时区</span><b>${esc(city.timezone)}</b></div><div><span>主时区组</span><b>${esc(city.timezoneGroupLabel || city.timezoneGroup)}</b></div><div><span>气候子类</span><b>${esc(city.climateSubcategoryLabel || city.climateSubcategory)}</b></div><div><span>UTC 主时区组名额</span><b>${num(city.timezoneGroupUsage?.plansReserved)} / 1</b></div><div><span>UTC 全局名额</span><b>${num(payload.paperRisk?.globalUsage?.plansReserved)} / ${num(payload.paperRisk?.globalUsage?.maxPlans)}</b></div><div><span>训练日</span><b>${num(m.training_days)}</b></div><div><span>未触碰评估日</span><b>${num(m.untouched_days)}</b></div><div><span>影子候选</span><b>${num(m.executable_candidates)}</b></div><div><span>今日策略通过</span><b>${num(city.todayQualified)}</b></div></div>
+    <div class="detail-note"><b>UTC 纸面风控：</b>${esc(city.timezoneGroupUsage?.reason || "每个主时区组当日最多一个计划。")} 当前主时区组预留 ${num(city.timezoneGroupUsage?.plansReserved)} 个；全局新增风险 ${num(payload.paperRisk?.globalUsage?.riskReservedU, 2)} / ${num(payload.paperRisk?.globalUsage?.maxDailyRiskU, 0)}U。</div>
     <div class="evidence"><h4>决策窗口</h4><div class="window-line">${esc(windowStageLabel(city.window?.stage))} · 正式窗口 ${city.window?.targetStartLocal ? esc(shortClock(city.window.targetStartLocal) + "–" + shortClock(city.window.targetEndLocal) + "（本地）") : "—"}</div></div>
     <div class="evidence"><h4>城市晋级证据</h4>${evidenceHtml}</div>
     <div class="detail-note">${city.hasReservedPlan ? `<b>纸面计划已预留：业务日 ${num(city.todayPlans)} 个 · 相关合约 ${num(city.activeReservations?.length)} 个</b><br>之后的阻断重估不会覆盖原计划。${city.latestEvaluation?.blocker ? `<br><b>当前评估阻断：${esc(blockerLabel(city.latestEvaluation.blocker, city.latestEvaluation.blockerExplanation))}</b>` : ""}` : city.latestEvaluation?.blocker ? `<b>当前主要阻断：${esc(blockerLabel(city.latestEvaluation.blocker, city.latestEvaluation.blockerExplanation))}</b><br>${esc(city.latestEvaluation.blockerExplanation?.description || "")}<br><small>判定：${esc(city.latestEvaluation.blockerExplanation?.condition || city.latestEvaluation.blocker)}｜解除：${esc(city.latestEvaluation.blockerExplanation?.recovery || "等待重新评估")}</small>` : city.latestDisposition ? `最新决策：${esc(city.latestDispositionLabel || dispositionLabel(city.latestDisposition))} · ${shortTime(city.latestDecisionAt)}` : `${esc(city.poolExplanation?.description || "尚无该城市今日决策。采集资格不等于交易资格。")}`}</div>`;
@@ -202,7 +202,7 @@ function renderDecisions(decisions) {
 }
 
 function renderOrders(orders) {
-  byId("orderGrid").innerHTML = orders.map(order => `<article class="order-card"><header><div><h3>${esc(order.cityId)} · ${esc(order.strategyAction)}</h3><p>${esc(order.planId)}</p></div><span class="status-badge status-${esc(order.state)}">${esc(order.state)}</span></header><div class="order-main"><div><span>计划仓位</span><b>${num(order.requestedStake,2)} U</b></div><div><span>执行方式</span><b>${esc(order.executionStyle)}</b></div></div><div class="legs">${(order.legs || []).map(leg => `<div class="leg"><span>${esc(leg.side)} ${esc(leg.label)}</span><span>@ ${num(leg.limit_price,4)}</span><span>${num(leg.shares,2)} 股</span></div>`).join("")}</div><div class="order-foot"><span>${order.executionAuthorized ? "实盘已授权" : "仅 Paper / Shadow"}</span><span>到期 ${shortTime(order.expiresAt)}</span></div></article>`).join("") || `<div class="empty-detail"><span>⌁</span><p>今日尚无可执行订单计划</p></div>`;
+  byId("orderGrid").innerHTML = orders.map(order => `<article class="order-card"><header><div><h3>${esc(order.cityId)} · ${esc(order.strategyAction)}</h3><p>${esc(order.planId)}</p></div><span class="status-badge status-${esc(order.state)}">${esc(order.state)}</span></header><div class="order-main"><div><span>计划仓位</span><b>${num(order.requestedStake,2)} U</b></div><div><span>执行方式</span><b>${esc(order.executionStyle)}</b></div></div><div class="legs">${(order.legs || []).map(leg => `<div class="leg"><span>${esc(leg.side)} ${esc(leg.label)}</span><span>@ ${num(leg.limit_price,4)}</span><span>${num(leg.shares,2)} 股</span></div>`).join("") || `<div class="leg empty">无腿详情（台账保留记录）</div>`}</div><div class="order-foot"><span>${order.executionAuthorized ? "影子已授权" : "仅影子 / Paper"}${order.stillQualified ? ` · <b class="still-text">策略仍有效</b>` : ""}</span><span>到期 ${shortTime(order.expiresAt)}</span></div></article>`).join("") || `<div class="empty-detail"><span>⌁</span><p>今日尚无可执行订单计划</p></div>`;
 }
 
 function renderDistribution(targetId, values) {

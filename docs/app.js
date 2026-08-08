@@ -272,6 +272,7 @@ function renderPaperAccount(account) {
     const ledger = t.ledgerStatus === "ACTIVE"
       ? `<span class="status-badge status-SHADOW_ELIGIBLE">已占名额</span>`
       : `<span class="status-badge ledger-released" title="该计划当时已生成正式执行清单，但名额后被他更优计划替换或到期释放；模拟账户仍按决策价入账结算">名额已释放</span>`;
+    const finalBucket = t.status === "SETTLED" ? (t.finalBucket || "—") : (t.finalBucket || "—");
     return `<tr class="${t.status === "OPEN" ? "account-open" : ""}">
       <td><b>${esc(t.contractDate || "—")}</b></td>
       <td><b>${esc(t.cityId)}</b><small class="sub">${esc(String(t.tradeId || "").slice(0, 12))}</small></td>

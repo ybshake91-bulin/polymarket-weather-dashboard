@@ -269,7 +269,9 @@ function renderPaperAccount(account) {
   byId("accountRows").innerHTML = filtered.slice().sort((a, b) => String(b.contractDate || "").localeCompare(String(a.contractDate || ""))).map(t => {
     const pnl = t.pnlU == null ? "—" : money(t.pnlU);
     const pnlCls = t.pnlU == null ? "" : Number(t.pnlU) > 0 ? "positive" : Number(t.pnlU) < 0 ? "negative" : "";
-    const finalBucket = t.status === "SETTLED" ? (t.finalBucket || "—") : (t.finalBucket || "—");
+    const ledger = t.ledgerStatus === "ACTIVE"
+      ? `<span class="status-badge status-SHADOW_ELIGIBLE">已占名额</span>`
+      : `<span class="status-badge ledger-released" title="该计划当时已生成正式执行清单，但名额后被他更优计划替换或到期释放；模拟账户仍按决策价入账结算">名额已释放</span>`;
     return `<tr class="${t.status === "OPEN" ? "account-open" : ""}">
       <td><b>${esc(t.contractDate || "—")}</b></td>
       <td><b>${esc(t.cityId)}</b><small class="sub">${esc(String(t.tradeId || "").slice(0, 12))}</small></td>
@@ -278,11 +280,12 @@ function renderPaperAccount(account) {
       <td>${num(t.entryPrice, 4)}</td>
       <td>${num(t.shares, 2)}</td>
       <td>${num(t.stakeU, 2)} U</td>
+      <td>${ledger}</td>
       <td><span class="status-badge status-${esc(t.status)}">${esc(t.status)}</span></td>
       <td>${esc(finalBucket)}</td>
       <td class="${pnlCls}">${pnl}</td>
     </tr>`;
-  }).join("") || `<tr class="empty-row"><td colspan="10">当前账期没有交易记录。调整账期筛选或等待每日入账。</td></tr>`;
+  }).join("") || `<tr class="empty-row"><td colspan="11">当前账期没有交易记录。调整账期筛选或等待每日入账。</td></tr>`;
 }
 
 function resetAccountPeriod() {

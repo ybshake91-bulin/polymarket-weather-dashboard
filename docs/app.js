@@ -374,7 +374,6 @@ if (typeof document !== "undefined") {
   byId("citySearch").addEventListener("input", renderCities);
   byId("poolFilter").addEventListener("change", renderCities);
   byId("tzFilter").addEventListener("change", renderCities);
-  byId("clearCityFilter").addEventListener("click", clearCityFilter);
   byId("accountFrom").addEventListener("change", event => { accountFrom = event.target.value; renderPaperAccount(payload?.paperAccount); });
   byId("accountTo").addEventListener("change", event => { accountTo = event.target.value; renderPaperAccount(payload?.paperAccount); });
   byId("accountPeriodReset").addEventListener("click", resetAccountPeriod);

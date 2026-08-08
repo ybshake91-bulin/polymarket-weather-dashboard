@@ -293,6 +293,14 @@ function resetAccountPeriod() {
   renderPaperAccount(payload?.paperAccount);
 }
 
+function setAccountPeriod(from, to, render = true) {
+  accountFrom = from || "";
+  accountTo = to || "";
+  if (render && typeof byId === "function" && byId("accountFrom")) byId("accountFrom").value = accountFrom;
+  if (render && typeof byId === "function" && byId("accountTo")) byId("accountTo").value = accountTo;
+  if (render && payload) renderPaperAccount(payload.paperAccount);
+}
+
 function renderOrders(orders) {
   byId("orderGrid").innerHTML = orders.map(order => `<article class="order-card"><header><div><h3>${esc(order.cityId)} · ${esc(order.strategyAction)}</h3><p>${esc(order.planId)}</p></div><span class="status-badge status-${esc(order.state)}">${esc(order.state)}</span></header><div class="order-main"><div><span>计划仓位</span><b>${num(order.requestedStake,2)} U</b></div><div><span>执行方式</span><b>${esc(order.executionStyle)}</b></div></div><div class="legs">${(order.legs || []).map(leg => `<div class="leg"><span>${esc(leg.side)} ${esc(leg.label)}</span><span>@ ${num(leg.vwap ?? leg.limit_price,4)}${leg.vwap != null && Math.abs(Number(leg.vwap)-Number(leg.limit_price)) > 1e-9 ? ` <small>限 ${num(leg.limit_price,4)}</small>` : ""}</span><span>${num(leg.shares,2)} 股</span></div>`).join("") || `<div class="leg empty">无腿详情（台账保留记录）</div>`}</div><div class="order-foot"><span>${order.executionAuthorized ? "影子已授权" : "仅影子 / Paper"}${order.stillQualified ? ` · <b class="still-text">策略仍有效</b>` : ""}</span><span>到期 ${shortTime(order.expiresAt)}</span></div></article>`).join("") || `<div class="empty-detail"><span>⌁</span><p>今日尚无可执行订单计划</p></div>`;
 }
@@ -375,5 +383,5 @@ if (typeof document !== "undefined") {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = {fetchDashboardJson, isDashboardPayload, loadDashboardPayload, refresh, renderReservedPlans, renderPaperAccount, resetAccountPeriod};
+  module.exports = {fetchDashboardJson, isDashboardPayload, loadDashboardPayload, refresh, renderReservedPlans, renderPaperAccount, resetAccountPeriod, setAccountPeriod};
 }

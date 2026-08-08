@@ -97,12 +97,12 @@
           <button class="filter-clear" id="accountPeriodReset" type="button">全部账期</button>
         </div>
       </header>
-      <p class="account-legend">模拟账户按当日全部正式执行清单入账；「名额已释放」表示该计划当时已生成正式清单、但名额后被他更优计划替换或到期释放（仍按决策价入账结算）。台账名额 = 当前仍占用的名额，两者口径不同属正常。</p>
+      <p class="account-legend">模拟账户按当日全部正式执行清单入账；「实测日最高」来自合约结算站的 METAR 实况累计最高温，不是模型预测，随采集刷新。 「名额已释放」表示该计划当时已生成正式清单、但名额后被他更优计划替换或到期释放（仍按决策价入账结算）。台账名额 = 当前仍占用的名额，两者口径不同属正常。</p>
       <div class="account-stats" id="accountStats"></div>
       <div class="account-period-stats" id="accountPeriodStats"></div>
       <div class="table-wrap">
         <table class="data-table account-table">
-          <thead><tr><th>合约日</th><th>城市</th><th>档位</th><th>方向</th><th>入场价</th><th>股数</th><th>仓位</th><th>名额</th><th>状态</th><th>结算档</th><th>PnL</th></tr></thead>
+          <thead><tr><th>合约日</th><th>城市</th><th>档位</th><th>实测日最高</th><th>方向</th><th>入场价</th><th>股数</th><th>仓位</th><th>名额</th><th>状态</th><th>结算档</th><th>PnL</th></tr></thead>
           <tbody id="accountRows"></tbody>
         </table>
       </div>
@@ -121,6 +121,6 @@
 
     <footer><span>WAP V4 · READ-ONLY MONITOR</span><span id="generatedAt">—</span></footer>
   </main>
-  <script src="./app.js?v=20260808-ledgerstatus" defer></script>
+  <script src="./app.js?v=20260808-observedhigh" defer></script>
 </body>
 </html>

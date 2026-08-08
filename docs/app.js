@@ -273,10 +273,17 @@ function renderPaperAccount(account) {
       ? `<span class="status-badge status-SHADOW_ELIGIBLE">已占名额</span>`
       : `<span class="status-badge ledger-released" title="该计划当时已生成正式执行清单，但名额后被他更优计划替换或到期释放；模拟账户仍按决策价入账结算">名额已释放</span>`;
     const finalBucket = t.status === "SETTLED" ? (t.finalBucket || "—") : (t.finalBucket || "—");
+    const observedHigh = t.observedHigh == null
+      ? "—"
+      : `${num(t.observedHigh, 1)}${esc(t.observedHighUnit || "")}`;
+    const observedTitle = t.observedHighUpdatedAt
+      ? `结算站 METAR 实测累计最高；数据源更新 ${shortTime(t.observedHighUpdatedAt)}`
+      : "结算站 METAR 实测累计最高";
     return `<tr class="${t.status === "OPEN" ? "account-open" : ""}">
       <td><b>${esc(t.contractDate || "—")}</b></td>
       <td><b>${esc(t.cityId)}</b><small class="sub">${esc(String(t.tradeId || "").slice(0, 12))}</small></td>
       <td>${esc(t.bucketLabel || "—")}</td>
+      <td title="${esc(observedTitle)}"><b class="observed-high">${observedHigh}</b><small class="sub">实测</small></td>
       <td><span class="account-side ${esc(t.side)}">${esc(t.side || "—")}</span></td>
       <td>${num(t.entryPrice, 4)}</td>
       <td>${num(t.shares, 2)}</td>
@@ -286,7 +293,7 @@ function renderPaperAccount(account) {
       <td>${esc(finalBucket)}</td>
       <td class="${pnlCls}">${pnl}</td>
     </tr>`;
-  }).join("") || `<tr class="empty-row"><td colspan="11">当前账期没有交易记录。调整账期筛选或等待每日入账。</td></tr>`;
+  }).join("") || `<tr class="empty-row"><td colspan="12">当前账期没有交易记录。调整账期筛选或等待每日入账。</td></tr>`;
 }
 
 function resetAccountPeriod() {

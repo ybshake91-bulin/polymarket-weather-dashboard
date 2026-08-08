@@ -15,7 +15,7 @@
       <span><b>WAP</b><small>WEATHER ALPHA PLATFORM · V4</small></span>
     </a>
     <nav>
-      <a href="#cities">城市池</a><a href="#decisions">决策</a><a href="#orders">订单</a><a href="#analytics">执行分析</a>
+      <a href="#cities">城市池</a><a href="#paper-account">模拟交易</a><a href="#orders">订单</a><a href="#analytics">执行分析</a>
     </nav>
     <div class="system-state" id="systemState">
       <span class="pulse"></span>
@@ -86,15 +86,23 @@
       </div>
     </section>
 
-    <section class="panel" id="decisions">
+    <section class="panel" id="paper-account">
       <header class="panel-head">
-        <div><p class="kicker">DECISION ENVELOPES</p><h2>当日决策</h2></div>
-        <div class="linked-controls"><span class="legend"><span class="dot qualified"></span>策略通过 <span class="dot authorized"></span>影子授权</span><span class="filter-chip" id="linkedFilterLabel">当前筛选：全部城市</span><button class="filter-clear" id="clearCityFilter" type="button" hidden>清除城市筛选</button></div>
+        <div><p class="kicker">SIMULATED CASH ACCOUNT</p><h2>模拟交易明细与统计</h2></div>
+        <div class="filters account-filters">
+          <label class="period-label">账期</label>
+          <input id="accountFrom" type="date" title="账期起始（合约本地日）">
+          <span class="period-sep">→</span>
+          <input id="accountTo" type="date" title="账期结束（合约本地日）">
+          <button class="filter-clear" id="accountPeriodReset" type="button">全部账期</button>
+        </div>
       </header>
+      <div class="account-stats" id="accountStats"></div>
+      <div class="account-period-stats" id="accountPeriodStats"></div>
       <div class="table-wrap">
-        <table class="data-table">
-          <thead><tr><th>时间</th><th>城市 / 合约日</th><th>决策</th><th>动作与档位</th><th>概率 / 包价</th><th>预期净 ROI</th><th>权限</th><th>首要原因</th></tr></thead>
-          <tbody id="decisionRows"></tbody>
+        <table class="data-table account-table">
+          <thead><tr><th>合约日</th><th>城市</th><th>档位</th><th>方向</th><th>入场价</th><th>股数</th><th>仓位</th><th>状态</th><th>结算档</th><th>PnL</th></tr></thead>
+          <tbody id="accountRows"></tbody>
         </table>
       </div>
     </section>
@@ -112,6 +120,6 @@
 
     <footer><span>WAP V4 · READ-ONLY MONITOR</span><span id="generatedAt">—</span></footer>
   </main>
-  <script src="./app.js?v=20260806-sixslots" defer></script>
+  <script src="./app.js?v=20260808-paperaccount" defer></script>
 </body>
 </html>

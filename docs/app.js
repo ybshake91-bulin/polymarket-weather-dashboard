@@ -190,13 +190,9 @@ function countBy(items, field) {
 }
 
 function renderLinkedPanels() {
-  const city = selectedCity();
-  const label = city ? `${city.name} / ${city.cityId}` : "全部城市";
-  byId("linkedFilterLabel").textContent = `当前筛选：${label}`;
-  byId("clearCityFilter").hidden = !city;
-  const decisions = cityScoped(payload.decisions);
   const orders = cityScoped(payload.orders);
-  renderDecisions(decisions); renderOrders(orders);
+  renderOrders(orders);
+  const decisions = cityScoped(payload.decisions);
   renderDistribution("dispositions", countBy(decisions, "disposition"));
   renderDistribution("executionStates", countBy(orders, "state"));
   const blockers = Object.entries(countBy(decisions.filter(d => d.primaryBlocker), "primaryBlocker"))
@@ -211,8 +207,90 @@ function clearCityFilter() {
   renderLinkedPanels();
 }
 
-function renderDecisions(decisions) {
-  byId("decisionRows").innerHTML = decisions.map(d => `<tr><td>${shortTime(d.emittedAt)}<small class="sub">${esc(d.decisionId)}</small></td><td><b>${esc(d.cityId)}</b><small class="sub">${esc(d.contractDate)}</small></td><td><span class="disposition ${esc(d.disposition)}">${esc(d.dispositionLabel || dispositionLabel(d.disposition))}</span><small class="sub">${esc(d.disposition)}</small></td><td>${esc(d.strategyAction)}<small class="sub">${esc((d.labels || []).join(" + ") || "—")}</small></td><td>${d.pCons == null ? "—" : pct(d.pCons)}<small class="sub">包价 ${d.packageCost == null ? "—" : num(d.packageCost,4)}</small></td><td class="${Number(d.expectedRoi) > 0 ? "positive" : Number(d.expectedRoi) < 0 ? "negative" : ""}">${pct(d.expectedRoi)}</td><td><div class="auth-stack" title="左：策略通过；右：实盘授权"><i class="auth-chip strategy ${d.strategyQualified ? "on" : ""}"></i><i class="auth-chip live ${d.executionAuthorized ? "on" : ""}"></i></div></td><td title="${esc(d.primaryBlockerExplanation?.condition || d.primaryBlocker || "")}">${esc(blockerLabel(d.primaryBlocker, d.primaryBlockerExplanation))}<small class="sub">${esc(d.primaryBlocker || "—")}</small></td></tr>`).join("") || `<tr class="empty-row"><td colspan="8">今日尚无决策。通过 CLI 或运行服务写入 monitoring.db 后会自动展示。</td></tr>`;
+// ---- 模拟交易明细与统计（paper-account） ----
+let accountFrom = "";
+let accountTo = "";
+
+function accountPeriodFiltered(account) {
+  const trades = account?.trades || [];
+  if (!accountFrom && !accountTo) return trades;
+  return trades.filter(t => {
+    const d = String(t.contractDate || "");
+    if (accountFrom && d < accountFrom) return false;
+    if (accountTo && d > accountTo) return false;
+    return true;
+  });
+}
+
+function accountPeriodStats(trades) {
+  const settled = trades.filter(t => t.status === "SETTLED" && t.pnlU != null);
+  const wins = settled.filter(t => Number(t.pnlU) > 0);
+  const losses = settled.filter(t => Number(t.pnlU) <= 0);
+  const pnl = settled.reduce((sum, t) => sum + Number(t.pnlU), 0);
+  const stake = trades.reduce((sum, t) => sum + Number(t.stakeU || 0), 0);
+  return {
+    trades: trades.length,
+    settled: settled.length,
+    open: trades.length - settled.length,
+    winRate: settled.length ? wins.length / settled.length : null,
+    pnlU: pnl,
+    stakeU: stake,
+    winCount: wins.length,
+    lossCount: losses.length,
+  };
+}
+
+function accountStatCard(label, value, sub = "", cls = "") {
+  return `<div class="account-stat ${cls}"><span>${esc(label)}</span><b>${value}</b>${sub ? `<small>${sub}</small>` : ""}</div>`;
+}
+
+function renderPaperAccount(account) {
+  const available = account && account.available;
+  const filtered = accountPeriodFiltered(account);
+  const period = accountPeriodStats(filtered);
+  if (!available) {
+    byId("accountStats").innerHTML = `<div class="empty-detail account-empty"><span>⌁</span><p>模拟账户尚未初始化（等待每日结算账本写入 paper-account.json）</p></div>`;
+    byId("accountPeriodStats").innerHTML = "";
+    byId("accountRows").innerHTML = "";
+    return;
+  }
+  const winRate = account.winRate == null ? "—" : pct(account.winRate);
+  byId("accountStats").innerHTML = [
+    accountStatCard("账户净值", money(account.equityU), `期初 ${num(account.startBalanceU,2)}U`),
+    accountStatCard("累计 PnL", money(account.cumPnlU), `累计 ROI ${pct(account.roiCumPct/100)}`, Number(account.cumPnlU) > 0 ? "positive" : Number(account.cumPnlU) < 0 ? "negative" : ""),
+    accountStatCard("现金余额", money(account.cashU), "可用 USDC 等价"),
+    accountStatCard("胜率", winRate, `盈利 ${num(account.winCount)} / 亏损 ${num(account.lossCount)}`),
+    accountStatCard("已结算交易", num(account.tradesSettled), `未结算 ${num(account.tradesOpen)}`),
+    accountStatCard("总交易腿数", num(account.tradesTotal), `盈利额 ${money(account.sumWinPnlU)} / 亏损额 ${money(account.sumLossPnlU)}`),
+  ].join("");
+  const rangeLabel = accountFrom || accountTo ? `${accountFrom || "起始"} → ${accountTo || "至今"}` : "全部账期";
+  const periodWin = period.winRate == null ? "—" : pct(period.winRate);
+  byId("accountPeriodStats").innerHTML = `<div class="period-stats-inner"><span class="period-chip">账期：${esc(rangeLabel)}</span><span>区间交易 ${num(period.trades)} 腿</span><span>区间结算 ${num(period.settled)}</span><span>区间胜率 ${periodWin}</span><span class="${period.pnlU > 0 ? "positive" : period.pnlU < 0 ? "negative" : ""}">区间已实现 PnL ${money(period.pnlU)}</span></div>`;
+  byId("accountRows").innerHTML = filtered.slice().sort((a, b) => String(b.contractDate || "").localeCompare(String(a.contractDate || ""))).map(t => {
+    const pnl = t.pnlU == null ? "—" : money(t.pnlU);
+    const pnlCls = t.pnlU == null ? "" : Number(t.pnlU) > 0 ? "positive" : Number(t.pnlU) < 0 ? "negative" : "";
+    const finalBucket = t.status === "SETTLED" ? (t.finalBucket || "—") : (t.finalBucket || "—");
+    return `<tr class="${t.status === "OPEN" ? "account-open" : ""}">
+      <td><b>${esc(t.contractDate || "—")}</b></td>
+      <td><b>${esc(t.cityId)}</b><small class="sub">${esc(String(t.tradeId || "").slice(0, 12))}</small></td>
+      <td>${esc(t.bucketLabel || "—")}</td>
+      <td><span class="account-side ${esc(t.side)}">${esc(t.side || "—")}</span></td>
+      <td>${num(t.entryPrice, 4)}</td>
+      <td>${num(t.shares, 2)}</td>
+      <td>${num(t.stakeU, 2)} U</td>
+      <td><span class="status-badge status-${esc(t.status)}">${esc(t.status)}</span></td>
+      <td>${esc(finalBucket)}</td>
+      <td class="${pnlCls}">${pnl}</td>
+    </tr>`;
+  }).join("") || `<tr class="empty-row"><td colspan="10">当前账期没有交易记录。调整账期筛选或等待每日入账。</td></tr>`;
+}
+
+function resetAccountPeriod() {
+  accountFrom = "";
+  accountTo = "";
+  byId("accountFrom").value = "";
+  byId("accountTo").value = "";
+  renderPaperAccount(payload?.paperAccount);
 }
 
 function renderOrders(orders) {
@@ -233,7 +311,7 @@ function render(data) {
   payload = data;
   renderSummary(data); renderAlerts(data.alerts || []); renderReservedPlans(data.reservedPlans || [], data.paperRisk); renderFunnel(data.funnel); renderPools(data.pools);
   if (selectedCityId && !data.cities.some(city => city.cityId === selectedCityId)) selectedCityId = null;
-  renderCities(); renderLinkedPanels();
+  renderCities(); renderLinkedPanels(); renderPaperAccount(data.paperAccount);
 }
 
 function isDashboardPayload(data) {
@@ -289,10 +367,13 @@ if (typeof document !== "undefined") {
   byId("poolFilter").addEventListener("change", renderCities);
   byId("tzFilter").addEventListener("change", renderCities);
   byId("clearCityFilter").addEventListener("click", clearCityFilter);
+  byId("accountFrom").addEventListener("change", event => { accountFrom = event.target.value; renderPaperAccount(payload?.paperAccount); });
+  byId("accountTo").addEventListener("change", event => { accountTo = event.target.value; renderPaperAccount(payload?.paperAccount); });
+  byId("accountPeriodReset").addEventListener("click", resetAccountPeriod);
   setInterval(() => byId("clock").textContent = new Date().toLocaleTimeString("zh-CN", {hour12:false}), 1000);
   refresh(); setInterval(refresh, 15000);
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = {fetchDashboardJson, isDashboardPayload, loadDashboardPayload, refresh, renderReservedPlans};
+  module.exports = {fetchDashboardJson, isDashboardPayload, loadDashboardPayload, refresh, renderReservedPlans, renderPaperAccount, resetAccountPeriod};
 }

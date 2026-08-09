@@ -288,6 +288,9 @@ function renderPaperAccount(account) {
     const executionSource = t.executionMode === "PAPER_SIMULATED"
       ? `${t.executionProvenance === "DEPLOYMENT_BACKFILL" ? "部署前回填 · " : ""}模拟 ${t.executionState || "成交"}${t.noExchangeOrder ? " · 未向交易所下单" : ""}`
       : "";
+    const settlement = t.settlementStatus === "POLYMARKET_OFFICIAL_SETTLED"
+      ? `<small class="sub" title="事件 ${esc(t.settlementEventId || "—")}">Polymarket 官方已结算</small>`
+      : "";
     return `<tr class="${t.status === "OPEN" ? "account-open" : ""}">
       <td><b>${esc(t.contractDate || "—")}</b></td>
       <td><b>${esc(t.cityId)}</b><small class="sub">${esc(String(t.tradeId || "").slice(0, 12))}</small>${executionSource ? `<small class="sub">${esc(executionSource)}</small>` : ""}</td>
@@ -298,7 +301,7 @@ function renderPaperAccount(account) {
       <td>${num(t.shares, 2)}</td>
       <td>${num(t.stakeU, 2)} U</td>
       <td>${ledger}</td>
-      <td><span class="status-badge status-${esc(t.status)}">${esc(t.status)}</span></td>
+      <td><span class="status-badge status-${esc(t.status)}">${esc(t.status)}</span>${settlement}</td>
       <td>${esc(finalBucket)}</td>
       <td class="${pnlCls}">${pnl}</td>
     </tr>`;

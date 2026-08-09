@@ -384,13 +384,18 @@ async function loadDashboardPayload() {
   }
 }
 
+let refreshInFlight = false;
 async function refresh() {
+  if (refreshInFlight) return;
+  refreshInFlight = true;
   try {
     render(await loadDashboardPayload());
   } catch (error) {
     byId("healthLabel").textContent = "OFFLINE";
     byId("freshness").textContent = error.message;
     byId("systemState").classList.remove("online");
+  } finally {
+    refreshInFlight = false;
   }
 }
 

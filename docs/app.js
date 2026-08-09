@@ -102,11 +102,17 @@ function renderReservedPlans(plans, paperRisk, decisions = payload?.decisions ||
 }
 
 function renderFunnel(funnel) {
-  const steps = [["决策重估(今日唯一)",funnel.decisionEvents],["策略通过(累计)",funnel.strategyQualified],["生成计划(累计)",funnel.planned],["提交执行",funnel.submitted],["完整成交",funnel.filled]];
+  const steps = [
+    ["决策重估(今日唯一)", funnel.decisionEvents, "按城市、合约日、合约去重的今日评估"],
+    ["策略通过(累计)", funnel.strategyQualified, "今日任一轮评估曾满足策略条件"],
+    ["生成计划(累计)", funnel.planned, "今日曾生成带计划编号的执行计划"],
+    ["提交执行", funnel.submitted, "同一批当日计划已进入提交状态或提交后的终态；预检和纸面预留不算提交"],
+    ["完整成交（全腿）", funnel.filled, "订单包所有腿完成成交（FILLED_ALL）或其确认、结算后继态；部分成交不计入"],
+  ];
   byId("funnel").innerHTML = steps.map((step, index) => {
     const base = index ? Number(steps[index-1][1]) : Number(step[1]);
     const rate = index ? (base ? Number(step[1]) / base : 0) : 1;
-    return `<div class="funnel-step"><span>${esc(step[0])}</span><strong>${num(step[1])}</strong><small>${index ? `阶段转化 ${pct(rate)}` : "有效重估事件"}</small></div>`;
+    return `<div class="funnel-step" title="${esc(step[2])}"><span>${esc(step[0])}</span><strong>${num(step[1])}</strong><small>${index ? `阶段转化 ${pct(rate)}` : "有效重估事件"}</small></div>`;
   }).join("");
 }
 

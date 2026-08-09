@@ -285,9 +285,12 @@ function renderPaperAccount(account) {
     const observedTitle = t.observedHighUpdatedAt
       ? `结算站 METAR 实测累计最高；数据源更新 ${shortTime(t.observedHighUpdatedAt)}`
       : "结算站 METAR 实测累计最高";
+    const executionSource = t.executionMode === "PAPER_SIMULATED"
+      ? `${t.executionProvenance === "DEPLOYMENT_BACKFILL" ? "部署前回填 · " : ""}模拟 ${t.executionState || "成交"}${t.noExchangeOrder ? " · 未向交易所下单" : ""}`
+      : "";
     return `<tr class="${t.status === "OPEN" ? "account-open" : ""}">
       <td><b>${esc(t.contractDate || "—")}</b></td>
-      <td><b>${esc(t.cityId)}</b><small class="sub">${esc(String(t.tradeId || "").slice(0, 12))}</small></td>
+      <td><b>${esc(t.cityId)}</b><small class="sub">${esc(String(t.tradeId || "").slice(0, 12))}</small>${executionSource ? `<small class="sub">${esc(executionSource)}</small>` : ""}</td>
       <td>${esc(t.bucketLabel || "—")}</td>
       <td title="${esc(observedTitle)}"><b class="observed-high">${observedHigh}</b><small class="sub">实测</small></td>
       <td><span class="account-side ${esc(t.side)}">${esc(t.side || "—")}</span></td>

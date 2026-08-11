@@ -230,15 +230,25 @@ function accountPeriodFiltered(account) {
 
 function accountPeriodStats(trades) {
   const settled = trades.filter(t => t.status === "SETTLED" && t.pnlU != null);
-  const wins = settled.filter(t => Number(t.pnlU) > 0);
-  const losses = settled.filter(t => Number(t.pnlU) <= 0);
+  // A multi-leg center package is one outcome for a city on its contract date.
+  const unitPnl = new Map();
+  settled.forEach(t => {
+    const city = String(t.cityId || "");
+    const date = String(t.contractDate || "");
+    const key = city && date ? `${city}\u0000${date}` : `legacy:${String(t.tradeId || "")}`;
+    unitPnl.set(key, (unitPnl.get(key) || 0) + Number(t.pnlU));
+  });
+  const unitValues = [...unitPnl.values()];
+  const wins = unitValues.filter(pnl => pnl > 0);
+  const losses = unitValues.filter(pnl => pnl <= 0);
   const pnl = settled.reduce((sum, t) => sum + Number(t.pnlU), 0);
   const stake = trades.reduce((sum, t) => sum + Number(t.stakeU || 0), 0);
   return {
     trades: trades.length,
     settled: settled.length,
+    settledUnits: unitValues.length,
     open: trades.length - settled.length,
-    winRate: settled.length ? wins.length / settled.length : null,
+    winRate: unitValues.length ? wins.length / unitValues.length : null,
     pnlU: pnl,
     stakeU: stake,
     winCount: wins.length,
@@ -265,13 +275,13 @@ function renderPaperAccount(account) {
     accountStatCard("账户净值", money(account.equityU), `期初 ${num(account.startBalanceU,2)}U`),
     accountStatCard("累计 PnL", money(account.cumPnlU), `累计 ROI ${pct(account.roiCumPct/100)}`, Number(account.cumPnlU) > 0 ? "positive" : Number(account.cumPnlU) < 0 ? "negative" : ""),
     accountStatCard("现金余额", money(account.cashU), "可用 USDC 等价"),
-    accountStatCard("胜率", winRate, `盈利 ${num(account.winCount)} / 亏损 ${num(account.lossCount)}`),
-    accountStatCard("已结算交易", num(account.tradesSettled), `未结算 ${num(account.tradesOpen)}`),
+    accountStatCard("胜率（城市·日期）", winRate, `盈利 ${num(account.winCount)} / 亏损 ${num(account.lossCount)}`),
+    accountStatCard("已结算交易腿", num(account.tradesSettled), `结算城市日 ${num(account.settledCityDateCount)}｜未结算 ${num(account.tradesOpen)}`),
     accountStatCard("总交易腿数", num(account.tradesTotal), `盈利额 ${money(account.sumWinPnlU)} / 亏损额 ${money(account.sumLossPnlU)}`),
   ].join("");
   const rangeLabel = accountFrom || accountTo ? `${accountFrom || "起始"} → ${accountTo || "至今"}` : "全部账期";
   const periodWin = period.winRate == null ? "—" : pct(period.winRate);
-  byId("accountPeriodStats").innerHTML = `<div class="period-stats-inner"><span class="period-chip">账期：${esc(rangeLabel)}</span><span>区间交易 ${num(period.trades)} 腿</span><span>区间结算 ${num(period.settled)}</span><span>区间胜率 ${periodWin}</span><span class="${period.pnlU > 0 ? "positive" : period.pnlU < 0 ? "negative" : ""}">区间已实现 PnL ${money(period.pnlU)}</span></div>`;
+  byId("accountPeriodStats").innerHTML = `<div class="period-stats-inner"><span class="period-chip">账期：${esc(rangeLabel)}</span><span>区间交易 ${num(period.trades)} 腿</span><span>区间结算 ${num(period.settled)} 腿 / ${num(period.settledUnits)} 城市日</span><span>区间胜率（城市·日期） ${periodWin}</span><span class="${period.pnlU > 0 ? "positive" : period.pnlU < 0 ? "negative" : ""}">区间已实现 PnL ${money(period.pnlU)}</span></div>`;
   byId("accountRows").innerHTML = filtered.slice().sort((a, b) => String(b.contractDate || "").localeCompare(String(a.contractDate || ""))).map(t => {
     const pnl = t.pnlU == null ? "—" : money(t.pnlU);
     const pnlCls = t.pnlU == null ? "" : Number(t.pnlU) > 0 ? "positive" : Number(t.pnlU) < 0 ? "negative" : "";

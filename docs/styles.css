@@ -138,7 +138,10 @@ input { width: 250px; } input:focus, select:focus { border-color: var(--line-bri
 .data-table th { position: sticky; top: 0; z-index: 2; padding: 10px; background: #0d141e; color: var(--muted); text-align: left; font: 600 9px ui-monospace, monospace; letter-spacing: .06em; white-space: nowrap; }
 .data-table td { padding: 11px 10px; border-top: 1px solid var(--line); vertical-align: middle; }
 .data-table tbody tr { transition: .15s; } .data-table tbody tr:hover, .data-table tbody tr.selected { background: rgba(91,225,247,.045); }
+.city-table { min-width: 1220px; }
 .city-table tbody tr { cursor: pointer; }
+.weather-cell { min-width: 145px; }
+.weather-cell b { display: block; color: var(--cyan); white-space: nowrap; }
 .city-name b { display: block; font-size: 12px; }.city-name small, .sub { color: var(--muted); font-size: 9px; }
 .status-badge { padding: 4px 6px; white-space: nowrap; color: var(--muted); }
 .status-COLLECT_FULL { color: var(--cyan); border-color: rgba(91,225,247,.28); }

@@ -144,15 +144,33 @@ function cityRows() {
   });
 }
 
+function cityWeatherText(weather = {}) {
+  const labels = Array.isArray(weather.forecastLabels) ? weather.forecastLabels.slice(0, 2) : [];
+  const probability = weather.forecastProbability == null ? "" : `（${pct(weather.forecastProbability)}）`;
+  const unit = String(weather.observedHighUnit || "").replace(/^°/, "");
+  return {
+    forecast: labels.length === 2 ? `${labels.join(" + ")}${probability}` : "等待V5预测",
+    observed: weather.observedHigh == null ? "等待实测" : `${num(weather.observedHigh, 1)}°${unit}`,
+    date: weather.contractDate || "—",
+    updatedAt: weather.forecastUpdatedAt || weather.observedHighUpdatedAt || null,
+  };
+}
+
 function renderCities() {
   const rows = cityRows();
-  byId("cityRows").innerHTML = rows.map(city => `<tr data-city="${esc(city.cityId)}" class="${city.cityId === selectedCityId ? "selected" : ""}">
+  byId("cityRows").innerHTML = rows.map(city => {
+    const weather = cityWeatherText(city.weatherToday);
+    return `<tr data-city="${esc(city.cityId)}" class="${city.cityId === selectedCityId ? "selected" : ""}">
     <td class="city-name"><b>${esc(city.name)}</b><small>${esc(city.cityId)}</small></td>
     <td><span class="status-badge ${statusClass(city.poolStatus)}">${esc(poolLabel(city.poolStatus, city.poolExplanation))}</span></td>
     <td><span>${esc(city.station)}</span><small class="sub">${esc(city.timezone)}</small></td>
-    <td>${esc(city.timezoneGroupLabel || city.timezoneGroup || city.correlationGroup)}</td><td><b>${num(city.todayDecisions)}</b><small class="sub">通过 ${num(city.todayQualified)} · 计划 ${num(city.todayPlans)}</small></td>
+    <td>${esc(city.timezoneGroupLabel || city.timezoneGroup || city.correlationGroup)}</td>
+    <td class="weather-cell"><b>${esc(weather.forecast)}</b><small class="sub">合约日 ${esc(weather.date)} · ${shortClock(city.weatherToday?.forecastUpdatedAt)}</small></td>
+    <td class="weather-cell"><b>${esc(weather.observed)}</b><small class="sub">结算站累计最高 · 10分钟刷新</small></td>
+    <td><b>${num(city.todayDecisions)}</b><small class="sub">通过 ${num(city.todayQualified)} · 计划 ${num(city.todayPlans)}</small></td>
     <td><div class="dimension-badges"><span class="status-badge ${statusClass(city.poolStatus)}">治理：${esc(poolLabel(city.poolStatus, city.poolExplanation))}</span><span class="status-badge">窗口：${esc(windowStageLabel(city.window?.stage))}</span><span class="disposition ${esc(city.latestDisposition || "")}">${esc(city.operationalStatus?.label || "等待评估")}</span></div><small class="sub">${esc(city.latestEvaluation?.blocker ? blockerLabel(city.latestEvaluation.blocker, city.latestEvaluation.blockerExplanation) : "无评估阻断")} · 下次 ${shortTime(city.window?.nextCheckAt || city.window?.nextTransitionAt)}</small></td>
-  </tr>`).join("") || `<tr class="empty-row"><td colspan="6">没有符合筛选条件的城市</td></tr>`;
+  </tr>`;
+  }).join("") || `<tr class="empty-row"><td colspan="8">没有符合筛选条件的城市</td></tr>`;
   byId("cityRows").querySelectorAll("tr[data-city]").forEach(row => row.addEventListener("click", () => selectCity(row.dataset.city)));
 }
 
@@ -163,6 +181,7 @@ function selectCity(cityId) {
   if (!city) return;
   byId("cityRows").querySelectorAll("tr").forEach(row => row.classList.toggle("selected", row.dataset.city === cityId));
   const m = city.metrics || {};
+  const weather = cityWeatherText(city.weatherToday);
   const evidence = [
     ["时间点完整率", metricValue(m,"point_in_time_completeness"), v => pct(v)],
     ["盘口完整率", metricValue(m,"book_completeness"), v => pct(v)],
@@ -171,7 +190,7 @@ function selectCity(cityId) {
   ];
   const evidenceHtml = evidence.map(([label,value,format]) => `<div class="evidence-row"><div><span>${label}</span><b>${value == null ? "未采集" : format(value)}</b></div><div class="bar-track"><div class="bar-fill" style="width:${value == null ? 0 : Math.max(0,Math.min(1,value))*100}%"></div></div></div>`).join("");
   byId("cityDetail").innerHTML = `<div class="detail-top"><div><h3>${esc(city.name)}</h3><p>${esc(city.cityId)} · ${esc(city.timezoneGroupLabel || city.timezoneGroup || city.correlationGroup)}</p></div><span class="status-badge ${statusClass(city.poolStatus)}">${esc(poolLabel(city.poolStatus, city.poolExplanation))}</span></div>
-    <div class="detail-grid"><div><span>结算站</span><b>${esc(city.station)}</b></div><div><span>本地时区</span><b>${esc(city.timezone)}</b></div><div><span>主时区组</span><b>${esc(city.timezoneGroupLabel || city.timezoneGroup)}</b></div><div><span>气候子类</span><b>${esc(city.climateSubcategoryLabel || city.climateSubcategory)}</b></div><div><span>UTC 主时区组名额</span><b>${num(city.timezoneGroupUsage?.plansReserved)} / 1</b></div><div><span>UTC 全局名额</span><b>${num(payload.paperRisk?.globalUsage?.plansReserved)} / ${num(payload.paperRisk?.globalUsage?.maxPlans)}</b></div><div><span>训练日</span><b>${num(m.training_days)}</b></div><div><span>未触碰评估日</span><b>${num(m.untouched_days)}</b></div><div><span>影子候选</span><b>${num(m.executable_candidates)}</b></div><div><span>今日策略通过</span><b>${num(city.todayQualified)}</b></div></div>
+    <div class="detail-grid"><div><span>当日V5预测两档</span><b>${esc(weather.forecast)}</b></div><div><span>当日结算站最高温</span><b>${esc(weather.observed)}</b><small class="sub">10分钟刷新 · ${shortClock(city.weatherToday?.observedHighUpdatedAt)}</small></div><div><span>结算站</span><b>${esc(city.station)}</b></div><div><span>本地时区</span><b>${esc(city.timezone)}</b></div><div><span>主时区组</span><b>${esc(city.timezoneGroupLabel || city.timezoneGroup)}</b></div><div><span>气候子类</span><b>${esc(city.climateSubcategoryLabel || city.climateSubcategory)}</b></div><div><span>UTC 主时区组名额</span><b>${num(city.timezoneGroupUsage?.plansReserved)} / 1</b></div><div><span>UTC 全局名额</span><b>${num(payload.paperRisk?.globalUsage?.plansReserved)} / ${num(payload.paperRisk?.globalUsage?.maxPlans)}</b></div><div><span>训练日</span><b>${num(m.training_days)}</b></div><div><span>未触碰评估日</span><b>${num(m.untouched_days)}</b></div><div><span>影子候选</span><b>${num(m.executable_candidates)}</b></div><div><span>今日策略通过</span><b>${num(city.todayQualified)}</b></div></div>
     <div class="detail-note"><b>UTC 纸面风控：</b>${esc(city.timezoneGroupUsage?.reason || "每个主时区组当日最多一个计划。")} 当前主时区组预留 ${num(city.timezoneGroupUsage?.plansReserved)} 个；全局新增风险 ${num(payload.paperRisk?.globalUsage?.riskReservedU, 2)} / ${num(payload.paperRisk?.globalUsage?.maxDailyRiskU, 0)}U。</div>
     <div class="evidence"><h4>决策窗口</h4><div class="window-line">${esc(windowStageLabel(city.window?.stage))} · 正式窗口 ${city.window?.targetStartLocal ? esc(shortClock(city.window.targetStartLocal) + "–" + shortClock(city.window.targetEndLocal) + "（本地）") : "—"}</div></div>
     <div class="evidence"><h4>城市晋级证据</h4>${evidenceHtml}</div>
@@ -424,5 +443,5 @@ if (typeof document !== "undefined") {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = {fetchDashboardJson, isDashboardPayload, loadDashboardPayload, refresh, renderReservedPlans, renderPaperAccount, resetAccountPeriod, setAccountPeriod};
+  module.exports = {cityWeatherText, fetchDashboardJson, isDashboardPayload, loadDashboardPayload, refresh, renderReservedPlans, renderPaperAccount, resetAccountPeriod, setAccountPeriod};
 }

@@ -332,7 +332,10 @@ function renderPaperAccount(account) {
       : "";
     const settlement = t.settlementStatus === "POLYMARKET_OFFICIAL_SETTLED"
       ? `<small class="sub" title="事件 ${esc(t.settlementEventId || "—")}">Polymarket 官方已结算</small>`
-      : "";
+      : t.settlementStatus === "POLYMARKET_AWAITING_VERIFIED_MAPPING"
+        ? `<small class="sub">官方映射待核验 · 不计当前版本官方胜率</small>`
+        : "";
+    const accountingStatus = t.status === "SETTLED" ? "模拟账本已结算" : (t.status || "—");
     return `<tr class="${t.status === "OPEN" ? "account-open" : ""}">
       <td><b>${esc(t.contractDate || "—")}</b></td>
       <td><b>${esc(t.cityId)}</b><small class="sub">${esc(String(t.tradeId || "").slice(0, 12))}</small>${executionSource ? `<small class="sub">${esc(executionSource)}</small>` : ""}</td>
@@ -343,7 +346,7 @@ function renderPaperAccount(account) {
       <td>${num(t.shares, 2)}</td>
       <td>${num(t.stakeU, 2)} U</td>
       <td>${ledger}</td>
-      <td><span class="status-badge status-${esc(t.status)}">${esc(t.status)}</span>${settlement}</td>
+      <td><span class="status-badge status-${esc(t.status)}" title="账本状态 ${esc(t.status)}">${esc(accountingStatus)}</span>${settlement}</td>
       <td>${esc(finalBucket)}</td>
       <td class="${pnlCls}">${pnl}</td>
     </tr>`;

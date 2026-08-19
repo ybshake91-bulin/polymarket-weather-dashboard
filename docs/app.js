@@ -291,11 +291,23 @@ function renderPaperAccount(account) {
     return;
   }
   const winRate = account.winRate == null ? "—" : pct(account.winRate);
+  const current = account.currentVersionPerformance;
+  const cohortRate = metric => Number(metric?.sampleN || 0) > 0
+    ? pct(metric.hitRate ?? metric.winRate)
+    : "等待当前版本样本";
+  const cohortSub = (metric, detail = "") => `样本 N=${num(metric?.sampleN || 0)}${detail ? ` · ${detail}` : ""}`;
+  const currentCards = current ? [
+    accountStatCard("当前版本 · 全部正式中心两档", cohortRate(current.allFormalCenterPair), cohortSub(current.allFormalCenterPair, `命中 ${num(current.allFormalCenterPair?.hitCount || 0)}`)),
+    accountStatCard("当前版本 · 策略选中中心两档", cohortRate(current.strategySelectedCenterPair), cohortSub(current.strategySelectedCenterPair, `命中 ${num(current.strategySelectedCenterPair?.hitCount || 0)}`)),
+    accountStatCard("当前版本 · 官方验证执行包胜率", cohortRate(current.officialExecutedPackages), cohortSub(current.officialExecutedPackages, `盈利 ${num(current.officialExecutedPackages?.winCount || 0)} / 亏损 ${num(current.officialExecutedPackages?.lossCount || 0)}`)),
+    accountStatCard("当前版本 · 命中→亏损转换损失", Number(current.conversionLoss?.sampleN || 0) > 0 ? `${num(current.conversionLoss?.count || 0)} 次` : "等待当前版本样本", cohortSub(current.conversionLoss, `未验证结算腿 ${num(current.excludedUnverifiedSettlementLegs || 0)} 条已隔离`)),
+  ] : [];
   byId("accountStats").innerHTML = [
     accountStatCard("账户净值", money(account.equityU), `期初 ${num(account.startBalanceU,2)}U`),
     accountStatCard("累计 PnL", money(account.cumPnlU), `累计 ROI ${pct(account.roiCumPct/100)}`, Number(account.cumPnlU) > 0 ? "positive" : Number(account.cumPnlU) < 0 ? "negative" : ""),
     accountStatCard("现金余额", money(account.cashU), "可用 USDC 等价"),
-    accountStatCard("胜率（城市·日期）", winRate, `盈利 ${num(account.winCount)} / 亏损 ${num(account.lossCount)}`),
+    accountStatCard("历史混合账户胜率", winRate, `盈利 ${num(account.winCount)} / 亏损 ${num(account.lossCount)}`),
+    ...currentCards,
     accountStatCard("已结算交易腿", num(account.tradesSettled), `结算城市日 ${num(account.settledCityDateCount)}｜未结算 ${num(account.tradesOpen)}`),
     accountStatCard("总交易腿数", num(account.tradesTotal), `盈利额 ${money(account.sumWinPnlU)} / 亏损额 ${money(account.sumLossPnlU)}`),
   ].join("");

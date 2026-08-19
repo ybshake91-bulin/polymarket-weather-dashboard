@@ -168,7 +168,7 @@ function renderCities() {
     <td>${esc(city.timezoneGroupLabel || city.timezoneGroup || city.correlationGroup)}</td>
     <td class="weather-cell"><b>${esc(weather.forecast)}</b><small class="sub">合约日 ${esc(weather.date)} · ${shortClock(city.weatherToday?.forecastUpdatedAt)}</small></td>
     <td class="weather-cell"><b>${esc(weather.observed)}</b><small class="sub">结算站累计最高 · 10分钟刷新</small></td>
-    <td><b>${num(city.todayDecisions)}</b><small class="sub">通过 ${num(city.todayQualified)} · 计划 ${num(city.todayPlans)}</small></td>
+    <td><b>${num(city.todayDecisions)}</b><small class="sub">累计通过 ${num(city.todayQualified)} · 占用计划 ${num(city.todayPlans)}</small></td>
     <td><div class="dimension-badges"><span class="status-badge ${statusClass(city.poolStatus)}">治理：${esc(poolLabel(city.poolStatus, city.poolExplanation))}</span><span class="status-badge">窗口：${esc(windowStageLabel(city.window?.stage))}</span><span class="disposition ${esc(city.latestDisposition || "")}">${esc(city.operationalStatus?.label || "等待评估")}</span></div><small class="sub">${esc(city.latestEvaluation?.blocker ? blockerLabel(city.latestEvaluation.blocker, city.latestEvaluation.blockerExplanation) : "无评估阻断")} · 下次 ${shortTime(city.window?.nextCheckAt || city.window?.nextTransitionAt)}</small></td>
   </tr>`;
   }).join("") || `<tr class="empty-row"><td colspan="8">没有符合筛选条件的城市</td></tr>`;

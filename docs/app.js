@@ -32,9 +32,10 @@ function renderSummary(data) {
   byId("metricDecisions").textContent = num(s.todayDecisions);
   // 策略通过 = 今日所有评估中曾通过策略的唯一城市/合约数（累计口径，与漏斗一致）。
   byId("metricQualified").textContent = `策略通过 ${s.strategyQualified}（今日累计）· 影子授权 ${s.executionAuthorized}`;
-  // 今日生成计划 = 今日评估中曾生成计划记录的唯一合约数；台账名额是持久化占用。
-  byId("metricPlans").textContent = num(s.plannedOrders);
-  byId("metricAuthorized").textContent = `台账名额 ${occupied} / ${maxPlans}${s.executionAuthorized ? ` · 影子授权 ${s.executionAuthorized}` : ""}`;
+  // 当前占用计划、标准纸面决策名额、可执行订单统一使用台账占用投影。
+  // plannedOrders 仅保留给“今日生成计划（累计）”漏斗使用。
+  byId("metricPlans").textContent = num(s.occupiedPlans ?? occupied);
+  byId("metricAuthorized").textContent = `已占名额 ${occupied} / ${maxPlans}${s.executionAuthorized ? ` · 影子授权 ${s.executionAuthorized}` : ""}`;
   byId("metricFillRate").textContent = pct(s.fillRate);
   byId("metricFilled").textContent = `成交 ${s.filledOrders} / 提交 ${s.submittedOrders}`;
   byId("metricRisk").textContent = money(s.openRiskU);
@@ -443,5 +444,5 @@ if (typeof document !== "undefined") {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = {cityWeatherText, fetchDashboardJson, isDashboardPayload, loadDashboardPayload, refresh, renderReservedPlans, renderPaperAccount, resetAccountPeriod, setAccountPeriod};
+  module.exports = {cityWeatherText, fetchDashboardJson, isDashboardPayload, loadDashboardPayload, refresh, renderSummary, renderReservedPlans, renderPaperAccount, resetAccountPeriod, setAccountPeriod};
 }

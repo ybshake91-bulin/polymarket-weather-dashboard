@@ -236,6 +236,17 @@ function clearCityFilter() {
 // ---- 模拟交易明细与统计（paper-account） ----
 let accountFrom = "";
 let accountTo = "";
+let accountPeriodInitialized = false;
+
+function initializeAccountPeriod(businessDate) {
+  if (accountPeriodInitialized) return;
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(String(businessDate || "")) ? String(businessDate) : "";
+  accountFrom = date;
+  accountTo = date;
+  accountPeriodInitialized = true;
+  if (typeof byId === "function" && byId("accountFrom")) byId("accountFrom").value = accountFrom;
+  if (typeof byId === "function" && byId("accountTo")) byId("accountTo").value = accountTo;
+}
 
 function accountPeriodFiltered(account) {
   const trades = account?.trades || [];

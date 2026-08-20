@@ -365,6 +365,7 @@ function renderPaperAccount(account) {
 }
 
 function resetAccountPeriod() {
+  accountPeriodInitialized = true;
   accountFrom = "";
   accountTo = "";
   byId("accountFrom").value = "";
@@ -373,6 +374,7 @@ function resetAccountPeriod() {
 }
 
 function setAccountPeriod(from, to, render = true) {
+  accountPeriodInitialized = true;
   accountFrom = from || "";
   accountTo = to || "";
   if (render && typeof byId === "function" && byId("accountFrom")) byId("accountFrom").value = accountFrom;
@@ -402,6 +404,7 @@ function render(data) {
   payload = data;
   renderSummary(data); renderAlerts(data.alerts || []); renderReservedPlans(data.reservedPlans || [], data.paperRisk); renderFunnel(data.funnel); renderPools(data.pools);
   if (selectedCityId && !data.cities.some(city => city.cityId === selectedCityId)) selectedCityId = null;
+  initializeAccountPeriod(data.businessDate);
   renderCities(); renderLinkedPanels(); renderPaperAccount(data.paperAccount);
 }
 
@@ -470,5 +473,5 @@ if (typeof document !== "undefined") {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = {cityWeatherText, fetchDashboardJson, isDashboardPayload, loadDashboardPayload, refresh, renderSummary, renderReservedPlans, renderPaperAccount, resetAccountPeriod, setAccountPeriod};
+  module.exports = {cityWeatherText, fetchDashboardJson, isDashboardPayload, loadDashboardPayload, refresh, renderSummary, renderReservedPlans, renderPaperAccount, initializeAccountPeriod, resetAccountPeriod, setAccountPeriod};
 }

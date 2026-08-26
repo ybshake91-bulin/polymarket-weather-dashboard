@@ -309,9 +309,7 @@ function renderPaperAccount(account) {
   const cohortSub = (metric, detail = "") => `样本 N=${num(metric?.sampleN || 0)}${detail ? ` · ${detail}` : ""}`;
   const currentCards = current ? [
     accountStatCard("当前版本 · 全部正式中心两档", cohortRate(current.allFormalCenterPair, "待正式评分"), cohortSub(current.allFormalCenterPair, `命中 ${num(current.allFormalCenterPair?.hitCount || 0)}`)),
-    accountStatCard("当前版本 · 策略选中中心两档", cohortRate(current.strategySelectedCenterPair, "待正式评分"), cohortSub(current.strategySelectedCenterPair, `命中 ${num(current.strategySelectedCenterPair?.hitCount || 0)}`)),
-    accountStatCard("当前版本 · 官方验证执行包胜率", cohortRate(current.officialExecutedPackages, "暂无官方结算样本"), cohortSub(current.officialExecutedPackages, `盈利 ${num(current.officialExecutedPackages?.winCount || 0)} / 亏损 ${num(current.officialExecutedPackages?.lossCount || 0)}`)),
-    accountStatCard("当前版本 · 命中→亏损转换损失", Number(current.conversionLoss?.sampleN || 0) > 0 ? `${num(current.conversionLoss?.count || 0)} 次` : "暂无官方结算样本", cohortSub(current.conversionLoss, `未验证结算腿 ${num(current.excludedUnverifiedSettlementLegs || 0)} 条已隔离`)),
+    accountStatCard("当前版本 · 决策执行统一包胜率", cohortRate(current.verifiedDecisionExecutionPackages, "暂无官方结算样本"), cohortSub(current.verifiedDecisionExecutionPackages, `盈利 ${num(current.verifiedDecisionExecutionPackages?.winCount || 0)} / 亏损 ${num(current.verifiedDecisionExecutionPackages?.lossCount || 0)} · 身份不一致 ${num(current.verifiedDecisionExecutionPackages?.identityMismatchCount || 0)} 包已隔离 · 未验证结算腿 ${num(current.excludedUnverifiedSettlementLegs || 0)} 条已隔离`)),
   ] : [];
   byId("accountStats").innerHTML = [
     accountStatCard("账户净值", money(account.equityU), `期初 ${num(account.startBalanceU,2)}U`),

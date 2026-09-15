@@ -222,7 +222,10 @@ function renderLinkedPanels() {
   renderDistribution("dispositions", countBy(decisions, "disposition"));
   renderDistribution("executionStates", countBy(orders, "state"));
   const blockers = Object.entries(countBy(decisions.filter(d => d.primaryBlocker), "primaryBlocker"))
-    .map(([code, count]) => ({code, count}))
+    .map(([code, count]) => {
+      const withExplanation = decisions.find(d => d.primaryBlocker === code && d.primaryBlockerExplanation);
+      return {code, count, explanation: withExplanation ? withExplanation.primaryBlockerExplanation : null};
+    })
     .sort((a, b) => b.count - a.count);
   renderBlockers(blockers);
 }
@@ -402,7 +405,7 @@ function renderDistribution(targetId, values) {
 }
 
 function renderBlockers(blockers) {
-  byId("blockers").innerHTML = blockers.map(item => `<div class="blocker"><span title="${esc(item.code)}">${esc(blockerLabel(item.code))}<small>${esc(item.code)}</small></span><b>${num(item.count)}</b></div>`).join("") || `<div class="empty-detail"><p>今日没有结构化阻断记录</p></div>`;
+  byId("blockers").innerHTML = blockers.map(item => `<div class="blocker"><span title="${esc(item.code)}">${esc(blockerLabel(item.code, item.explanation))}<small>${esc(item.code)}</small></span><b>${num(item.count)}</b></div>`).join("") || `<div class="empty-detail"><p>今日没有结构化阻断记录</p></div>`;
 }
 
 function render(data) {

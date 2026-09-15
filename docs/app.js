@@ -10,7 +10,7 @@ const shortTime = value => value ? new Date(value).toLocaleTimeString("zh-CN", {
 const shortClock = value => value ? new Date(value).toLocaleTimeString("zh-CN", {hour:"2-digit", minute:"2-digit", hour12:false}) : "—";
 const freshness = seconds => seconds == null ? "等待首条运行数据" : seconds < 60 ? `${seconds} 秒前更新` : seconds < 3600 ? `${Math.floor(seconds/60)} 分钟前更新` : `${Math.floor(seconds/3600)} 小时前更新`;
 const statusClass = status => `status-${esc(status)}`;
-const poolLabel = (status, explanation) => explanation?.label || ({COLLECT_FULL:"完整采集",COLLECT_LITE:"轻量采集",MODEL_ELIGIBLE:"模型合格",SHADOW_ELIGIBLE:"影子合格",CASH_ELIGIBLE:"现金合格",BLOCKED_RULE:"规则阻断",BLOCKED_DATA:"数据阻断",BLOCKED_SKILL:"模型阻断",BLOCKED_LIQUIDITY:"流动性阻断",SUSPENDED_RISK:"风险暂停",UNIVERSE:"候选全集"}[status] || status);
+const poolLabel = (status, explanation) => explanation?.label || ({COLLECT_FULL:"完整采集",COLLECT_LITE:"轻量采集",MODEL_ELIGIBLE:"模型合格",SHADOW_ELIGIBLE:"影子合格",FORMAL_ELIGIBLE:"正式推行",CASH_ELIGIBLE:"现金合格",BLOCKED_RULE:"规则阻断",BLOCKED_DATA:"数据阻断",BLOCKED_SKILL:"模型阻断",BLOCKED_LIQUIDITY:"流动性阻断",SUSPENDED_RISK:"风险暂停",UNIVERSE:"候选全集"}[status] || status);
 const dispositionLabel = status => ({EXECUTE_NOW:"可立即执行",POST_MAKER:"可挂限价单",WAIT:"等待更新",SKIP:"暂不操作",HOLD:"持有观察",REDUCE:"减仓",EXIT:"退出",REBALANCE:"调仓",BLOCKED:"被硬性阻断"}[status] || status || "等待数据");
 const windowStageLabel = stage => ({BEFORE_WATCH:"观察前",WATCHING:"观察中",DECISION_OPEN:"决策打开(非正式)",TARGET_WINDOW:"正式决策窗口",RISK_ONLY:"仅风控",CLOSED:"已关闭",BLOCKED:"阻断"}[stage] || stage || "未评估");
 const blockerLabel = (code, explanation) => explanation?.label || ({DAILY_NEW_RISK_LIMIT:"今日新增风险额度已满",DAILY_PACKAGE_COUNT_LIMIT:"今日计划名额已满",CLIMATE_SUBCATEGORY_DAILY_PLAN_LIMIT:"气候子类当日计划已占用",TIMEZONE_GROUP_DAILY_PLAN_LIMIT:"主时区组当日名额已满",CITY_NOT_SHADOW_ELIGIBLE:"城市未获策略准入",CITY_BLOCKED_RULE:"城市规则禁止",WEATHER_DATA_STALE:"天气数据已过期",MARKET_BOOK_STALE:"盘口快照已过期",MARKET_BOOK_SEQUENCE_GAP:"盘口序列不连续",MARKET_BUCKET_MAPPING_MISMATCH:"合约档位映射异常",CONTRACT_RULES_UNVERIFIED:"合约规则未验证",VALUATION_INPUT_INVALID:"估值输入不合法",RISK_LIMIT_BLOCKED:"风险规则阻断",NO_POSITIVE_EXECUTABLE_ACTION:"没有可成交的正期望机会"}[code] || code || "无阻断");
@@ -481,5 +481,5 @@ if (typeof document !== "undefined") {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = {cityWeatherText, fetchDashboardJson, isDashboardPayload, loadDashboardPayload, refresh, renderSummary, renderReservedPlans, renderPaperAccount, initializeAccountPeriod, resetAccountPeriod, setAccountPeriod};
+  module.exports = {cityWeatherText, fetchDashboardJson, isDashboardPayload, loadDashboardPayload, refresh, renderSummary, renderPools, renderReservedPlans, renderPaperAccount, initializeAccountPeriod, resetAccountPeriod, setAccountPeriod};
 }

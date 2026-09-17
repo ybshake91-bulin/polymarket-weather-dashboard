@@ -140,6 +140,58 @@ input { width: 250px; } input:focus, select:focus { border-color: var(--line-bri
 .data-table tbody tr { transition: .15s; } .data-table tbody tr:hover, .data-table tbody tr.selected { background: rgba(91,225,247,.045); }
 .city-table { min-width: 1220px; }
 .city-table tbody tr { cursor: pointer; }
+
+/* ---- 城市格子视图：按当地窗口时间先后布局，一行 5 个 ---- */
+.city-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+.city-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-height: 82px;
+  padding: 9px 10px;
+  border: 1px solid var(--tile-color, var(--line));
+  border-left: 3px solid var(--tile-color, var(--line));
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.008));
+  cursor: pointer;
+  transition: .15s;
+}
+.city-tile:hover, .city-tile.selected {
+  background: color-mix(in srgb, var(--tile-color, #fff) 14%, transparent);
+  box-shadow: 0 0 0 1px var(--tile-color, var(--line));
+}
+.city-tile-head { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
+.city-tile-head b { font-size: 12px; line-height: 1.25; }
+.city-tile-head small { color: var(--muted); font: 600 9px ui-monospace, monospace; }
+.city-tile-state {
+  display: inline-flex; align-items: center; gap: 4px;
+  font: 700 9px ui-monospace, monospace; letter-spacing: .04em;
+  color: var(--tile-color, var(--muted));
+}
+.city-tile-state .dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--tile-color, var(--muted));
+  flex: none;
+}
+.city-tile-body { font-size: 10px; line-height: 1.4; color: var(--muted); }
+.city-tile-body b { color: var(--text); font-size: 11px; }
+.city-tile-foot { margin-top: auto; display: flex; justify-content: space-between; gap: 6px; font: 600 9px ui-monospace, monospace; color: var(--muted); }
+
+/* 状态配色：灰=窗口已过无决策 蓝=未开始 绿=进行中 红=异常 金=已推送决策 */
+.city-tile.tile-pending  { --tile-color: #6b7c8f; }
+.city-tile.tile-upcoming { --tile-color: var(--blue); }
+.city-tile.tile-active   { --tile-color: var(--green); }
+.city-tile.tile-error    { --tile-color: var(--red); }
+.city-tile.tile-pushed   { --tile-color: var(--amber); }
+
+.city-grid-legend { display: flex; flex-wrap: wrap; gap: 12px; margin: 0 0 10px; font: 600 10px ui-monospace, monospace; color: var(--muted); }
+.city-grid-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.city-grid-legend i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
 .weather-cell { min-width: 145px; }
 .weather-cell b { display: block; color: var(--cyan); white-space: nowrap; }
 .city-name b { display: block; font-size: 12px; }.city-name small, .sub { color: var(--muted); font-size: 9px; }
@@ -182,6 +234,7 @@ input { width: 250px; } input:focus, select:focus { border-color: var(--line-bri
 .distribution { display: grid; gap: 11px; }.distribution-row { display: grid; grid-template-columns: 120px 1fr 35px; align-items: center; gap: 8px; }.distribution-row label { color: var(--muted); font: 9px ui-monospace, monospace; }.distribution-row b { text-align: right; font: 11px ui-monospace, monospace; }
 .blocker-list { display: grid; gap: 7px; }.blocker { display: flex; justify-content: space-between; gap: 12px; padding: 9px 10px; background: #111923; border-left: 2px solid var(--red); font: 9px ui-monospace, monospace; }.blocker span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; }.blocker b { color: var(--red); }
 footer { display: flex; justify-content: space-between; color: #536172; padding-top: 28px; font: 9px ui-monospace, monospace; letter-spacing: .08em; }
-@media (max-width: 1180px) { .metric-grid { grid-template-columns: repeat(3, 1fr); }.slot-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.order-grid { grid-template-columns: repeat(2, 1fr); }.city-layout { grid-template-columns: 1fr; }.city-detail { min-height: auto; }.account-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 1180px) { .metric-grid { grid-template-columns: repeat(3, 1fr); }.slot-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.order-grid { grid-template-columns: repeat(2, 1fr); }.city-layout { grid-template-columns: 1fr; }.city-detail { min-height: auto; }.account-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }.city-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 720px) { .city-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 800px) { nav { display: none; }.shell { width: min(100% - 22px, 1460px); padding-top: 28px; }.masthead { align-items: flex-start; flex-direction: column; min-height: 0; }.mast-meta { text-align: left; border-right: 0; border-left: 2px solid var(--cyan); padding: 0 0 0 15px; }.metric-grid { grid-template-columns: repeat(2, 1fr); }.slot-grid { grid-template-columns: 1fr; }.split-grid, .analytics-grid { grid-template-columns: 1fr; }.funnel { grid-template-columns: 1fr; }.funnel-step, .funnel-step:first-child { clip-path: none; min-height: auto; }.order-grid { grid-template-columns: 1fr; }.city-head { align-items: flex-start; flex-direction: column; }.filters { width: 100%; }.filters input { flex: 1; min-width: 0; }.topbar { padding: 0 14px; }.brand small { display: none; } }
 @media (max-width: 480px) { .metric-grid, .slot-grid, .account-stats { grid-template-columns: 1fr; }.system-state { min-width: auto; }.system-state > span:last-child { display: none; }.filters { flex-direction: column; }.filters input, .filters select { width: 100%; }.panel { padding: 15px; } }

@@ -147,25 +147,32 @@ function cityRows() {
 
 // 按当地决策窗口的“绝对时刻”由东向西排列：惠灵顿最早，其后亚洲、欧洲、美洲，无窗口的香港最后。
 //
-// 不能直接对 targetStartLocal 排序。该字段是滚动写入的“下一个窗口”，
-// 有的城市停在今天、有的已经滚到后天（如亚特兰大/旧金山为 09-19），
-// 且所有城市的本地时分都是 10:45，字符串比较实际只比了 UTC 偏移量，
-// 会把 13 座亚洲城市和整个欧洲/美洲打散到末尾。
+// 不能直接对 window.targetStartLocal 排序：它是“最新一条评估”的窗口，而引擎每 tick
+// 会滚出 今天/明天/后天 三条前瞻决策，最新那条往往是后天，导致同一时刻的城市
+// 有的停在今天、有的跳到后天，顺序被完全打乱（所有城市本地时分都是 10:45，
+// 字符串比较实际只比 UTC 偏移）。
 //
-// 正确做法：把所有城市归一到业务日（payload.businessDate）当天本地 10:45，
-// 再转成 UTC 绝对时刻比较。窗口已滚到未来日期的城市因此回到今天的正确位置。
+// 正确做法：用城市当前本地时间（window.nowLocal 提供城市自身时区）把窗口
+// 归一到“城市当地今天”，再取当天的 10:45 转绝对时刻比较。
 function cityWindowSortKey(city) {
-  const raw = city.window?.targetStartLocal || city.window?.nextTransitionAt || "";
-  const parsed = Date.parse(raw);
-  if (!Number.isFinite(parsed)) return Number.POSITIVE_INFINITY;
-  const businessDate = payload?.businessDate;
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(businessDate || ""))) return parsed;
-  // 用该城市自身时区把业务日的 10:45 还原成绝对时刻。
-  // 时区取自 targetStartLocal 内嵌的偏移量（如 +12:00 / -04:00）。
-  const offset = /([+-]\d{2}:\d{2})$/.exec(String(raw));
-  if (!offset) return parsed;
-  const stamped = Date.parse(`${businessDate}T10:45:00${offset[1]}`);
-  return Number.isFinite(stamped) ? stamped : parsed;
+  const startClock = cityLocalWallClock(city.window?.targetStartLocal);
+  const nowIso = city.window?.nowLocal;
+  const nowClock = cityLocalWallClock(nowIso);
+  if (!startClock || !nowClock) {
+    const raw = city.window?.targetStartLocal || city.window?.nextTransitionAt || "";
+    const parsed = Date.parse(raw);
+    return Number.isFinite(parsed) ? parsed : Number.POSITIVE_INFINITY;
+  }
+  // nowLocal 形如 2026-09-17T19:24:07+09:00，取其日期与偏移，
+  // 拼出“该城市当地今天 10:45”的绝对时刻。
+  const offset = /([+-]\d{2}:\d{2})$/.exec(String(nowIso || ""));
+  const today = cityLocalDate(nowIso);
+  if (!offset || today === "—") {
+    const parsed = Date.parse(city.window?.targetStartLocal || "");
+    return Number.isFinite(parsed) ? parsed : Number.POSITIVE_INFINITY;
+  }
+  const stamped = Date.parse(`${today}T${startClock.hm}:00${offset[1]}`);
+  return Number.isFinite(stamped) ? stamped : Number.POSITIVE_INFINITY;
 }
 
 function compareCityWindowOrder(a, b) {
@@ -205,12 +212,13 @@ const HARD_BLOCKER_CODES = new Set([
 const TRADEABLE_POOLS = new Set(["FORMAL_ELIGIBLE", "SHADOW_ELIGIBLE"]);
 
 function cityTileState(city) {
-  const stage = city.window?.stage || "";
+  // 用“城市当地今天”的阶段，而不是最新评估（可能是后天前瞻）的阶段。
+  const stage = cityTodayStage(city);
   const opCode = city.operationalStatus?.code || "";
   const pool = city.poolStatus || "";
   const pushed = Number(city.todayPlans || 0) > 0 || city.hasReservedPlan === true;
   const inWindow = stage === "DECISION_OPEN" || stage === "WATCHING";
-  const beforeWindow = stage === "BEFORE_WATCH" || opCode === "BEFORE_WATCH";
+  const beforeWindow = stage === "BEFORE_WATCH";
 
   // 1) 已推送决策 —— 最高优先级
   if (pushed) {
@@ -248,6 +256,49 @@ function cityLocalClock(iso) {
   return match ? `${match[1]}:${match[2]}` : "—";
 }
 
+// 取 ISO 里的当地日期部分（2026-09-17T10:45:00+12:00 → 2026-09-17）。
+function cityLocalDate(iso) {
+  const match = /^(\d{4}-\d{2}-\d{2})T/.exec(String(iso || ""));
+  return match ? match[1] : "—";
+}
+
+// 取 ISO 里的当地 wall-clock 时分（含秒），返回 {hm, minutes}。
+function cityLocalWallClock(iso) {
+  const match = /T(\d{2}):(\d{2})(?::(\d{2}))?/.exec(String(iso || ""));
+  if (!match) return null;
+  const h = Number(match[1]);
+  const m = Number(match[2]);
+  return {hm: `${match[1]}:${match[2]}`, minutes: h * 60 + m};
+}
+
+// 判断“该城市当地今天”的决策窗口处于哪个阶段。
+//
+// 为什么不能直接用 window.stage：它是“最新一条评估”的阶段，而引擎每 tick 会
+// 滚出 今天/明天/后天 三条前瞻决策，最新那条几乎总是后天的 BEFORE_WATCH。
+// 于是窗口早已走完的城市也会显示成“未开始”，且格子上的日期会和合约日打架。
+//
+// 这里改用窗口自身的时刻 + 城市当前本地时间推算今天的阶段（窗口日程固定为
+// 当地 10:30 观察 / 10:45 锁定 / 11:00 关闭），与城市治理规则同源。
+function cityTodayStage(city) {
+  const startClock = cityLocalWallClock(city.window?.targetStartLocal);
+  const endClock = cityLocalWallClock(city.window?.targetEndLocal);
+  const nowClock = cityLocalWallClock(city.window?.nowLocal);
+  if (!startClock || !nowClock) return city.window?.stage || "";
+  const windowDate = cityLocalDate(city.window?.targetStartLocal);
+  const nowDate = cityLocalDate(city.window?.nowLocal);
+  const lockMinutes = startClock.minutes - 15;   // 当地 10:30 观察起点
+  const closeMinutes = (endClock ? endClock.minutes : startClock.minutes + 15);
+  // 前瞻窗口（窗口日期晚于城市当地今天）→ 今天的窗口尚未到来
+  if (windowDate !== "—" && nowDate !== "—" && windowDate > nowDate) return "BEFORE_WATCH";
+  // 窗口日期早于今天 → 今天的窗口早已结束
+  if (windowDate !== "—" && nowDate !== "—" && windowDate < nowDate) return "CLOSED";
+  const now = nowClock.minutes;
+  if (now < lockMinutes) return "BEFORE_WATCH";
+  if (now < startClock.minutes) return "WATCHING";
+  if (now < closeMinutes) return "DECISION_OPEN";
+  return "CLOSED";
+}
+
 function cityWeatherText(weather = {}) {
   const labels = Array.isArray(weather.forecastLabels) ? weather.forecastLabels.slice(0, 2) : [];
   const probability = weather.forecastProbability == null ? "" : `（${pct(weather.forecastProbability)}）`;
@@ -265,7 +316,14 @@ function renderCities() {
   byId("cityRows").innerHTML = rows.map(city => {
     const weather = cityWeatherText(city);
     const state = cityTileState(city);
-    return `<article class="city-tile ${state.cls} ${city.cityId === selectedCityId ? "selected" : ""}" data-city="${esc(city.cityId)}" title="${esc(city.name)} · ${esc(state.label)}">
+    // 格子显示该城市“当地今天”的窗口时刻，而不是最新一条评估的合约日。
+    // 引擎每次 tick 会为同一城市滚出 今天/明天/后天 三条前瞻决策，
+    // latestEvaluation 指向前瞻窗口（这是刻意设计，用于匹配明天的名额），
+    // 但格子上显示的必须是今天 —— 否则日期会显示成后天。
+    const todayDate = weather.date && weather.date !== "—" ? weather.date : null;
+    const windowDate = cityLocalDate(city.window?.targetStartLocal);
+    const windowIsLookahead = Boolean(todayDate && windowDate !== "—" && windowDate !== todayDate);
+    return `<article class="city-tile ${state.cls} ${city.cityId === selectedCityId ? "selected" : ""}" data-city="${esc(city.cityId)}" title="${esc(city.name)} · ${esc(state.label)}${windowIsLookahead ? ` · 已前瞻评估 ${windowDate}` : ""}">
       <div class="city-tile-head">
         <b>${esc(city.name)}</b>
         <small>${cityLocalClock(city.window?.targetStartLocal)}</small>
@@ -277,7 +335,7 @@ function renderCities() {
       </div>
       <div class="city-tile-foot">
         <span>决策 ${num(city.todayDecisions)} · 通过 ${num(city.todayQualified)} · 计划 ${num(city.todayPlans)}</span>
-        <span>${esc(windowStageLabel(city.window?.stage))}</span>
+        <span>${esc(windowStageLabel(cityTodayStage(city)))}${windowIsLookahead ? " · 已前瞻明后天" : ""}</span>
       </div>
     </article>`;
   }).join("") || `<div class="empty-detail"><p>没有符合筛选条件的城市</p></div>`;
@@ -590,5 +648,5 @@ if (typeof document !== "undefined") {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = {cityWeatherText, fetchDashboardJson, isDashboardPayload, loadDashboardPayload, refresh, renderSummary, renderPools, renderReservedPlans, renderPaperAccount, initializeAccountPeriod, resetAccountPeriod, setAccountPeriod, cityTileState, compareCityWindowOrder, cityWindowSortKey, cityLocalClock};
+  module.exports = {cityWeatherText, fetchDashboardJson, isDashboardPayload, loadDashboardPayload, refresh, renderSummary, renderPools, renderReservedPlans, renderPaperAccount, initializeAccountPeriod, resetAccountPeriod, setAccountPeriod, cityTileState, cityTodayStage, compareCityWindowOrder, cityWindowSortKey, cityLocalClock, cityLocalDate};
 }

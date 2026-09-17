@@ -79,6 +79,9 @@ function renderReservedPlans(plans, paperRisk, decisions = payload?.decisions ||
     <div class="slot-grid">${(group.slots || []).map(slot => {
       const r = slot.reservation;
       const plan = r ? plansById.get(r.planId) : null;
+      // payload.decisions 只含业务日当天（展示口径）。若某个预留计划的决策是明后天的
+      // 前瞻行而不在其中，查不到时下面的 labels/action 会退回 plan、合约日退回
+      // r.contractDate，卡片仍完整，只是少一行"窗口 stage"。
       const decision = r ? decisions.find(d => d.decisionId === r.decisionId) : null;
       const window = decision?.decisionWindow || {};
       const labels = (plan?.labels || decision?.labels || []).join(" + ") || "档位待同步";

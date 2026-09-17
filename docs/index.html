@@ -74,11 +74,15 @@
         </div>
       </header>
       <div class="city-layout">
-        <div class="table-wrap city-table-wrap">
-          <table class="data-table city-table">
-            <thead><tr><th>城市</th><th>资格池</th><th>站点 / 时区</th><th>主时区组</th><th>当日预测两档</th><th>当日最高温</th><th>今日决策</th><th>最新状态</th></tr></thead>
-            <tbody id="cityRows"></tbody>
-          </table>
+        <div class="city-grid-wrap">
+          <div class="city-grid-legend">
+            <span><i style="background:#ffc56e"></i>已推送决策</span>
+            <span><i style="background:#64e6ad"></i>决策进行中</span>
+            <span><i style="background:#699cff"></i>未开始</span>
+            <span><i style="background:#6b7c8f"></i>窗口已过·无决策</span>
+            <span><i style="background:#ff7285"></i>异常</span>
+          </div>
+          <div class="city-grid" id="cityRows"></div>
         </div>
         <aside class="city-detail" id="cityDetail">
           <div class="empty-detail"><span>◎</span><p>选择一座城市查看治理证据与当日分析</p></div>

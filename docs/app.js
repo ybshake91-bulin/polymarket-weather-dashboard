@@ -154,18 +154,37 @@ function cityWindowSortKey(city) {
 }
 
 function compareCityWindowOrder(a, b) {
-  const delta = cityWindowSortKey(a) - cityWindowSortKey(b);
-  if (delta !== 0 && Number.isFinite(delta)) return delta;
-  return String(a.name || a.cityId).localeCompare(String(b.name || b.cityId), "zh-CN");
+  const ka = cityWindowSortKey(a);
+  const kb = cityWindowSortKey(b);
+  // 两座城市都没有窗口时间时 Infinity-Infinity=NaN，必须先按相等处理，
+  // 否则会落到名称比较，让缺窗口的城市插到最前面。
+  if (ka === kb) {
+    return String(a.name || a.cityId).localeCompare(String(b.name || b.cityId), "zh-CN");
+  }
+  if (ka === Number.POSITIVE_INFINITY) return 1;
+  if (kb === Number.POSITIVE_INFINITY) return -1;
+  return ka - kb;
 }
 
 // 格子状态：灰=窗口已过无决策 蓝=未开始 绿=进行中 红=异常 金=已推送决策
 // “已推送决策”以真正生成正式计划为准（todayPlans / hasReservedPlan），
 // 而不是 todayDecisions —— 完整评估但空仓跳过的城市不应被标为已推送。
 //
-// 判定顺序很关键：已推送必须优先于异常。窗口走完后 runner 会把状态标成
-// RISK_ONLY/BLOCKED_EVALUATION，那是正常的收尾而不是故障；若先判异常，
-// 当天成功推送过的城市会全部被涂成红色。
+// 判定顺序很关键：
+// 1) 已推送优先于一切。窗口走完后 runner 会把 stage 收尾成 RISK_ONLY，
+//    那是正常结束而不是故障；若先判异常，当天成功推送过的城市会全被涂红。
+// 2) stage=RISK_ONLY/BLOCKED_EVALUATION 本身也不代表异常 —— 它只是“当地窗口
+//    今天已走完”的通用收尾状态（惠灵顿、伊斯坦布尔、纽约都是如此）。真正的
+//    异常必须是窗口内的硬阻断（数据/盘口过期、合约规则不匹配等）。
+const HARD_BLOCKER_CODES = new Set([
+  "WEATHER_DATA_STALE", "MARKET_BOOK_STALE", "MARKET_BOOK_SEQUENCE_GAP",
+  "MARKET_BUCKET_MAPPING_MISMATCH", "CONTRACT_RULES_UNVERIFIED",
+  "VALUATION_INPUT_INVALID", "MARKET_SNAPSHOT_AFTER_EVALUATION_TIME",
+  "MARKET_SNAPSHOT_BEFORE_1045_LOCK", "FORMAL_SNAPSHOT_AFTER_1045_CUTOFF",
+  "FORMAL_WEATHER_FREEZE_UNAVAILABLE", "WEATHER_RECEIVED_IN_FUTURE",
+  "DECISION_WINDOW_TARGET_LOCK_MISSING", "RISK_LIMIT_BLOCKED",
+]);
+
 function cityTileState(city) {
   const stage = city.window?.stage || "";
   const opCode = city.operationalStatus?.code || "";
@@ -176,17 +195,28 @@ function cityTileState(city) {
   if (opCode === "BLOCKED_GOVERNANCE" || city.poolStatus === "BLOCKED_RULE") {
     return {cls: "tile-error", label: "规则阻断"};
   }
-  if (opCode === "BLOCKED_EVALUATION" || city.latestDisposition === "BLOCKED" || stage === "BLOCKED") {
+  // 仅窗口内的硬阻断才算异常
+  const blocker = city.latestEvaluation?.blocker || city.primaryBlocker || "";
+  const inWindow = stage === "DECISION_OPEN" || stage === "WATCHING";
+  if (inWindow && HARD_BLOCKER_CODES.has(blocker)) {
     return {cls: "tile-error", label: "异常"};
   }
-  if (stage === "DECISION_OPEN") {
+  if (stage === "DECISION_OPEN" || stage === "WATCHING") {
     return {cls: "tile-active", label: "决策进行中"};
   }
-  if (stage === "BEFORE_WATCH") {
+  if (stage === "BEFORE_WATCH" || opCode === "BEFORE_WATCH") {
     return {cls: "tile-upcoming", label: "未开始"};
   }
-  // 窗口已走完（RISK_ONLY / CLOSED）但没有生成计划
+  // 窗口已走完（RISK_ONLY / CLOSED / BLOCKED_EVALUATION 收尾）且未生成计划
   return {cls: "tile-pending", label: "窗口已过·无决策"};
+}
+
+// 城市本地时钟：targetStartLocal 形如 2026-09-17T10:45:00+12:00。
+// 不能用 shortClock()，那会按浏览器时区换算（惠灵顿 10:45 会显示成 06:45）。
+// 这里直接取 ISO 字符串里的当地 wall-clock 时分。
+function cityLocalClock(iso) {
+  const match = /T(\d{2}):(\d{2})/.exec(String(iso || ""));
+  return match ? `${match[1]}:${match[2]}` : "—";
 }
 
 function cityWeatherText(weather = {}) {
@@ -209,7 +239,7 @@ function renderCities() {
     return `<article class="city-tile ${state.cls} ${city.cityId === selectedCityId ? "selected" : ""}" data-city="${esc(city.cityId)}" title="${esc(city.name)} · ${esc(state.label)}">
       <div class="city-tile-head">
         <b>${esc(city.name)}</b>
-        <small>${shortClock(city.window?.targetStartLocal)}</small>
+        <small>${cityLocalClock(city.window?.targetStartLocal)}</small>
       </div>
       <span class="city-tile-state"><i class="dot"></i>${esc(state.label)}</span>
       <div class="city-tile-body">
@@ -531,5 +561,5 @@ if (typeof document !== "undefined") {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = {cityWeatherText, fetchDashboardJson, isDashboardPayload, loadDashboardPayload, refresh, renderSummary, renderPools, renderReservedPlans, renderPaperAccount, initializeAccountPeriod, resetAccountPeriod, setAccountPeriod, cityTileState, compareCityWindowOrder, cityWindowSortKey};
+  module.exports = {cityWeatherText, fetchDashboardJson, isDashboardPayload, loadDashboardPayload, refresh, renderSummary, renderPools, renderReservedPlans, renderPaperAccount, initializeAccountPeriod, resetAccountPeriod, setAccountPeriod, cityTileState, compareCityWindowOrder, cityWindowSortKey, cityLocalClock};
 }

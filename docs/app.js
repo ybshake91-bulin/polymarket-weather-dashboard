@@ -145,12 +145,27 @@ function cityRows() {
   }).sort(compareCityWindowOrder);
 }
 
-// 按当地决策窗口时间先后排列：惠灵顿这类东侧时区最早，美西最晚。
-// 缺少窗口时间的城市（如规则阻断的香港）排到最后，而不是污染首屏顺序。
+// 按当地决策窗口的“绝对时刻”由东向西排列：惠灵顿最早，其后亚洲、欧洲、美洲，无窗口的香港最后。
+//
+// 不能直接对 targetStartLocal 排序。该字段是滚动写入的“下一个窗口”，
+// 有的城市停在今天、有的已经滚到后天（如亚特兰大/旧金山为 09-19），
+// 且所有城市的本地时分都是 10:45，字符串比较实际只比了 UTC 偏移量，
+// 会把 13 座亚洲城市和整个欧洲/美洲打散到末尾。
+//
+// 正确做法：把所有城市归一到业务日（payload.businessDate）当天本地 10:45，
+// 再转成 UTC 绝对时刻比较。窗口已滚到未来日期的城市因此回到今天的正确位置。
 function cityWindowSortKey(city) {
   const raw = city.window?.targetStartLocal || city.window?.nextTransitionAt || "";
   const parsed = Date.parse(raw);
-  return Number.isFinite(parsed) ? parsed : Number.POSITIVE_INFINITY;
+  if (!Number.isFinite(parsed)) return Number.POSITIVE_INFINITY;
+  const businessDate = payload?.businessDate;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(businessDate || ""))) return parsed;
+  // 用该城市自身时区把业务日的 10:45 还原成绝对时刻。
+  // 时区取自 targetStartLocal 内嵌的偏移量（如 +12:00 / -04:00）。
+  const offset = /([+-]\d{2}:\d{2})$/.exec(String(raw));
+  if (!offset) return parsed;
+  const stamped = Date.parse(`${businessDate}T10:45:00${offset[1]}`);
+  return Number.isFinite(stamped) ? stamped : parsed;
 }
 
 function compareCityWindowOrder(a, b) {
@@ -166,49 +181,63 @@ function compareCityWindowOrder(a, b) {
   return ka - kb;
 }
 
-// 格子状态：灰=窗口已过无决策 蓝=未开始 绿=进行中 红=异常 金=已推送决策
-// “已推送决策”以真正生成正式计划为准（todayPlans / hasReservedPlan），
-// 而不是 todayDecisions —— 完整评估但空仓跳过的城市不应被标为已推送。
+// 格子状态：灰=已执行(窗口已过) 蓝=未开始 绿=进行中 红=异常 金=已推送决策
 //
-// 判定顺序很关键：
-// 1) 已推送优先于一切。窗口走完后 runner 会把 stage 收尾成 RISK_ONLY，
-//    那是正常结束而不是故障；若先判异常，当天成功推送过的城市会全被涂红。
-// 2) stage=RISK_ONLY/BLOCKED_EVALUATION 本身也不代表异常 —— 它只是“当地窗口
-//    今天已走完”的通用收尾状态（惠灵顿、伊斯坦布尔、纽约都是如此）。真正的
-//    异常必须是窗口内的硬阻断（数据/盘口过期、合约规则不匹配等）。
+// 关键语义：
+// 1) “已推送”优先于一切。窗口走完后 runner 会把 stage 收尾成 RISK_ONLY，
+//    那是正常结束而非故障；若先判异常，当天成功推送过的城市会全被涂红。
+// 2) WEATHER_DATA_STALE / CITY_NOT_SHADOW_ELIGIBLE 这类 blocker 会出现在
+//    几乎所有窗口已过的城市上（东京、伊斯坦布尔、莫斯科、惠灵顿都是），
+//    它们是每日正常收尾的残留，不是异常。
+// 3) 因此：窗口一旦走完，未推送就是灰色“已执行” —— 不再看 blocker。
+//    红色只留给“本应交易却出现硬故障”的情形：窗口内硬阻断，或正式可交易
+//    城市（FORMAL_ELIGIBLE）在窗口关闭时没能产出决策。
 const HARD_BLOCKER_CODES = new Set([
-  "WEATHER_DATA_STALE", "MARKET_BOOK_STALE", "MARKET_BOOK_SEQUENCE_GAP",
+  "MARKET_BOOK_STALE", "MARKET_BOOK_SEQUENCE_GAP",
   "MARKET_BUCKET_MAPPING_MISMATCH", "CONTRACT_RULES_UNVERIFIED",
   "VALUATION_INPUT_INVALID", "MARKET_SNAPSHOT_AFTER_EVALUATION_TIME",
   "MARKET_SNAPSHOT_BEFORE_1045_LOCK", "FORMAL_SNAPSHOT_AFTER_1045_CUTOFF",
   "FORMAL_WEATHER_FREEZE_UNAVAILABLE", "WEATHER_RECEIVED_IN_FUTURE",
-  "DECISION_WINDOW_TARGET_LOCK_MISSING", "RISK_LIMIT_BLOCKED",
+  "DECISION_WINDOW_TARGET_LOCK_MISSING",
 ]);
+
+// 可交易城市：只有这些城市“没产出决策”才算问题；轻量采集城市本来就只观察。
+const TRADEABLE_POOLS = new Set(["FORMAL_ELIGIBLE", "SHADOW_ELIGIBLE"]);
 
 function cityTileState(city) {
   const stage = city.window?.stage || "";
   const opCode = city.operationalStatus?.code || "";
+  const pool = city.poolStatus || "";
   const pushed = Number(city.todayPlans || 0) > 0 || city.hasReservedPlan === true;
+  const inWindow = stage === "DECISION_OPEN" || stage === "WATCHING";
+  const beforeWindow = stage === "BEFORE_WATCH" || opCode === "BEFORE_WATCH";
+
+  // 1) 已推送决策 —— 最高优先级
   if (pushed) {
     return {cls: "tile-pushed", label: "已推送决策"};
   }
-  if (opCode === "BLOCKED_GOVERNANCE" || city.poolStatus === "BLOCKED_RULE") {
+  // 2) 规则阻断（香港 HKO 结算源未适配）—— 结构性阻断，与当日窗口无关
+  if (opCode === "BLOCKED_GOVERNANCE" || pool === "BLOCKED_RULE") {
     return {cls: "tile-error", label: "规则阻断"};
   }
-  // 仅窗口内的硬阻断才算异常
+  // 3) 窗口内硬阻断 —— 真正的异常
   const blocker = city.latestEvaluation?.blocker || city.primaryBlocker || "";
-  const inWindow = stage === "DECISION_OPEN" || stage === "WATCHING";
   if (inWindow && HARD_BLOCKER_CODES.has(blocker)) {
     return {cls: "tile-error", label: "异常"};
   }
-  if (stage === "DECISION_OPEN" || stage === "WATCHING") {
+  // 4) 窗口进行中
+  if (inWindow) {
     return {cls: "tile-active", label: "决策进行中"};
   }
-  if (stage === "BEFORE_WATCH" || opCode === "BEFORE_WATCH") {
+  // 5) 尚未到窗口
+  if (beforeWindow) {
     return {cls: "tile-upcoming", label: "未开始"};
   }
-  // 窗口已走完（RISK_ONLY / CLOSED / BLOCKED_EVALUATION 收尾）且未生成计划
-  return {cls: "tile-pending", label: "窗口已过·无决策"};
+  // 6) 窗口已走完、未推送 —— 正式可交易城市仍无决策才算异常，其余为正常“已执行”
+  if (TRADEABLE_POOLS.has(pool) && HARD_BLOCKER_CODES.has(blocker)) {
+    return {cls: "tile-error", label: "异常"};
+  }
+  return {cls: "tile-pending", label: "已执行"};
 }
 
 // 城市本地时钟：targetStartLocal 形如 2026-09-17T10:45:00+12:00。

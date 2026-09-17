@@ -271,32 +271,33 @@ function cityLocalWallClock(iso) {
   return {hm: `${match[1]}:${match[2]}`, minutes: h * 60 + m};
 }
 
-// 判断“该城市当地今天”的决策窗口处于哪个阶段。
+// 判断“该城市在业务日内的决策窗口”处于哪个阶段。
 //
-// 为什么不能直接用 window.stage：它是“最新一条评估”的阶段，而引擎每 tick 会
-// 滚出 今天/明天/后天 三条前瞻决策，最新那条几乎总是后天的 BEFORE_WATCH。
-// 于是窗口早已走完的城市也会显示成“未开始”，且格子上的日期会和合约日打架。
+// 唯一权威值来自后端的 window.businessDayStage：后端把业务日（北京 06:00 翻页）
+// 映射到每城唯一的合约日（该城当地 10:45 落在该业务日内的那一天），再由城市当地
+// 时刻判定阶段。前端只做展示，不再自己推算，避免与后端口径分叉。
 //
-// 这里改用窗口自身的时刻 + 城市当前本地时间推算今天的阶段（窗口日程固定为
-// 当地 10:30 观察 / 10:45 锁定 / 11:00 关闭），与城市治理规则同源。
+// 为什么不能用 window.stage：它是“最新一条评估”的阶段，而引擎每 tick 会滚出
+// 今天/明天/后天三条前瞻决策，最新那条几乎总是后天的 BEFORE_WATCH，会把已收尾
+// 的城市染成“未开始”。窗口日程固定为当地 10:30 观察 / 10:45 锁定 / 11:00 关闭。
 function cityTodayStage(city) {
+  const authoritative = city.window?.businessDayStage;
+  if (authoritative) return String(authoritative);
+  // 后端未提供时回退到旧的前端推算（保持对历史载荷的兼容）。
   const startClock = cityLocalWallClock(city.window?.targetStartLocal);
-  const endClock = cityLocalWallClock(city.window?.targetEndLocal);
   const nowClock = cityLocalWallClock(city.window?.nowLocal);
   if (!startClock || !nowClock) return city.window?.stage || "";
   const windowDate = cityLocalDate(city.window?.targetStartLocal);
   const nowDate = cityLocalDate(city.window?.nowLocal);
-  const lockMinutes = startClock.minutes - 15;   // 当地 10:30 观察起点
-  const closeMinutes = (endClock ? endClock.minutes : startClock.minutes + 15);
-  // 前瞻窗口（窗口日期晚于城市当地今天）→ 今天的窗口尚未到来
+  const lockMinutes = startClock.minutes - 15;
+  const closeMinutes = (cityLocalWallClock(city.window?.targetEndLocal) || startClock).minutes;
   if (windowDate !== "—" && nowDate !== "—" && windowDate > nowDate) return "BEFORE_WATCH";
-  // 窗口日期早于今天 → 今天的窗口早已结束
-  if (windowDate !== "—" && nowDate !== "—" && windowDate < nowDate) return "CLOSED";
+  if (windowDate !== "—" && nowDate !== "—" && windowDate < nowDate) return "RISK_ONLY";
   const now = nowClock.minutes;
   if (now < lockMinutes) return "BEFORE_WATCH";
   if (now < startClock.minutes) return "WATCHING";
   if (now < closeMinutes) return "DECISION_OPEN";
-  return "CLOSED";
+  return "RISK_ONLY";
 }
 
 function cityWeatherText(weather = {}) {
@@ -316,22 +317,22 @@ function renderCities() {
   byId("cityRows").innerHTML = rows.map(city => {
     const weather = cityWeatherText(city);
     const state = cityTileState(city);
-    // 格子显示该城市“当地今天”的窗口时刻，而不是最新一条评估的合约日。
-    // 引擎每次 tick 会为同一城市滚出 今天/明天/后天 三条前瞻决策，
-    // latestEvaluation 指向前瞻窗口（这是刻意设计，用于匹配明天的名额），
-    // 但格子上显示的必须是今天 —— 否则日期会显示成后天。
-    const todayDate = weather.date && weather.date !== "—" ? weather.date : null;
+    // 格子日期一律用业务日（后端 window.businessDay，北京 06:00 翻页）。
+    // 注意不能用 window.targetStartLocal：那是"最新一条评估"的合约日，而引擎每
+    // tick 会滚出 今天/明天/后天 三条前瞻决策，最新那条往往落在后天，日期会跳。
+    // weather.contractDate 现在也锚定到业务日，两者应当一致。
+    const businessDay = city.window?.businessDay || weather.date || "—";
     const windowDate = cityLocalDate(city.window?.targetStartLocal);
-    const windowIsLookahead = Boolean(todayDate && windowDate !== "—" && windowDate !== todayDate);
+    const windowIsLookahead = Boolean(businessDay !== "—" && windowDate !== "—" && windowDate !== businessDay);
     return `<article class="city-tile ${state.cls} ${city.cityId === selectedCityId ? "selected" : ""}" data-city="${esc(city.cityId)}" title="${esc(city.name)} · ${esc(state.label)}${windowIsLookahead ? ` · 已前瞻评估 ${windowDate}` : ""}">
       <div class="city-tile-head">
         <b>${esc(city.name)}</b>
-        <small>${cityLocalClock(city.window?.targetStartLocal)}</small>
+        <small>${esc(businessDay)}</small>
       </div>
       <span class="city-tile-state"><i class="dot"></i>${esc(state.label)}</span>
       <div class="city-tile-body">
         <b>${esc(weather.forecast)}</b>
-        <div>实测 ${esc(weather.observed)} · 合约日 ${esc(weather.date)}</div>
+        <div>实测 ${esc(weather.observed)} · 当地 ${cityLocalClock(city.window?.nowLocal)}</div>
       </div>
       <div class="city-tile-foot">
         <span>决策 ${num(city.todayDecisions)} · 通过 ${num(city.todayQualified)} · 计划 ${num(city.todayPlans)}</span>

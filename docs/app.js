@@ -142,7 +142,51 @@ function cityRows() {
     const tzGroup = city.timezoneGroup || city.correlationGroup || "";
     const text = `${city.name} ${city.cityId} ${city.station || ""} ${tzGroup}`.toLowerCase();
     return (!query || text.includes(query)) && (pool === "ALL" || city.poolStatus === pool) && (tz === "ALL" || tzGroup === tz);
-  });
+  }).sort(compareCityWindowOrder);
+}
+
+// 按当地决策窗口时间先后排列：惠灵顿这类东侧时区最早，美西最晚。
+// 缺少窗口时间的城市（如规则阻断的香港）排到最后，而不是污染首屏顺序。
+function cityWindowSortKey(city) {
+  const raw = city.window?.targetStartLocal || city.window?.nextTransitionAt || "";
+  const parsed = Date.parse(raw);
+  return Number.isFinite(parsed) ? parsed : Number.POSITIVE_INFINITY;
+}
+
+function compareCityWindowOrder(a, b) {
+  const delta = cityWindowSortKey(a) - cityWindowSortKey(b);
+  if (delta !== 0 && Number.isFinite(delta)) return delta;
+  return String(a.name || a.cityId).localeCompare(String(b.name || b.cityId), "zh-CN");
+}
+
+// 格子状态：灰=窗口已过无决策 蓝=未开始 绿=进行中 红=异常 金=已推送决策
+// “已推送决策”以真正生成正式计划为准（todayPlans / hasReservedPlan），
+// 而不是 todayDecisions —— 完整评估但空仓跳过的城市不应被标为已推送。
+//
+// 判定顺序很关键：已推送必须优先于异常。窗口走完后 runner 会把状态标成
+// RISK_ONLY/BLOCKED_EVALUATION，那是正常的收尾而不是故障；若先判异常，
+// 当天成功推送过的城市会全部被涂成红色。
+function cityTileState(city) {
+  const stage = city.window?.stage || "";
+  const opCode = city.operationalStatus?.code || "";
+  const pushed = Number(city.todayPlans || 0) > 0 || city.hasReservedPlan === true;
+  if (pushed) {
+    return {cls: "tile-pushed", label: "已推送决策"};
+  }
+  if (opCode === "BLOCKED_GOVERNANCE" || city.poolStatus === "BLOCKED_RULE") {
+    return {cls: "tile-error", label: "规则阻断"};
+  }
+  if (opCode === "BLOCKED_EVALUATION" || city.latestDisposition === "BLOCKED" || stage === "BLOCKED") {
+    return {cls: "tile-error", label: "异常"};
+  }
+  if (stage === "DECISION_OPEN") {
+    return {cls: "tile-active", label: "决策进行中"};
+  }
+  if (stage === "BEFORE_WATCH") {
+    return {cls: "tile-upcoming", label: "未开始"};
+  }
+  // 窗口已走完（RISK_ONLY / CLOSED）但没有生成计划
+  return {cls: "tile-pending", label: "窗口已过·无决策"};
 }
 
 function cityWeatherText(weather = {}) {
@@ -160,19 +204,25 @@ function cityWeatherText(weather = {}) {
 function renderCities() {
   const rows = cityRows();
   byId("cityRows").innerHTML = rows.map(city => {
-    const weather = cityWeatherText(city.weatherToday);
-    return `<tr data-city="${esc(city.cityId)}" class="${city.cityId === selectedCityId ? "selected" : ""}">
-    <td class="city-name"><b>${esc(city.name)}</b><small>${esc(city.cityId)}</small></td>
-    <td><span class="status-badge ${statusClass(city.poolStatus)}">${esc(poolLabel(city.poolStatus, city.poolExplanation))}</span></td>
-    <td><span>${esc(city.station)}</span><small class="sub">${esc(city.timezone)}</small></td>
-    <td>${esc(city.timezoneGroupLabel || city.timezoneGroup || city.correlationGroup)}</td>
-    <td class="weather-cell"><b>${esc(weather.forecast)}</b><small class="sub">合约日 ${esc(weather.date)} · ${shortClock(city.weatherToday?.forecastUpdatedAt)}</small></td>
-    <td class="weather-cell"><b>${esc(weather.observed)}</b><small class="sub">结算站累计最高 · 10分钟刷新</small></td>
-    <td><b>${num(city.todayDecisions)}</b><small class="sub">累计通过 ${num(city.todayQualified)} · 占用计划 ${num(city.todayPlans)}</small></td>
-    <td><div class="dimension-badges"><span class="status-badge ${statusClass(city.poolStatus)}">治理：${esc(poolLabel(city.poolStatus, city.poolExplanation))}</span><span class="status-badge">窗口：${esc(windowStageLabel(city.window?.stage))}</span><span class="disposition ${esc(city.latestDisposition || "")}">${esc(city.operationalStatus?.label || "等待评估")}</span></div><small class="sub">${esc(city.latestEvaluation?.blocker ? blockerLabel(city.latestEvaluation.blocker, city.latestEvaluation.blockerExplanation) : "无评估阻断")} · 下次 ${shortTime(city.window?.nextCheckAt || city.window?.nextTransitionAt)}</small></td>
-  </tr>`;
-  }).join("") || `<tr class="empty-row"><td colspan="8">没有符合筛选条件的城市</td></tr>`;
-  byId("cityRows").querySelectorAll("tr[data-city]").forEach(row => row.addEventListener("click", () => selectCity(row.dataset.city)));
+    const weather = cityWeatherText(city);
+    const state = cityTileState(city);
+    return `<article class="city-tile ${state.cls} ${city.cityId === selectedCityId ? "selected" : ""}" data-city="${esc(city.cityId)}" title="${esc(city.name)} · ${esc(state.label)}">
+      <div class="city-tile-head">
+        <b>${esc(city.name)}</b>
+        <small>${shortClock(city.window?.targetStartLocal)}</small>
+      </div>
+      <span class="city-tile-state"><i class="dot"></i>${esc(state.label)}</span>
+      <div class="city-tile-body">
+        <b>${esc(weather.forecast)}</b>
+        <div>实测 ${esc(weather.observed)} · 合约日 ${esc(weather.date)}</div>
+      </div>
+      <div class="city-tile-foot">
+        <span>决策 ${num(city.todayDecisions)} · 通过 ${num(city.todayQualified)} · 计划 ${num(city.todayPlans)}</span>
+        <span>${esc(windowStageLabel(city.window?.stage))}</span>
+      </div>
+    </article>`;
+  }).join("") || `<div class="empty-detail"><p>没有符合筛选条件的城市</p></div>`;
+  byId("cityRows").querySelectorAll("article[data-city]").forEach(tile => tile.addEventListener("click", () => selectCity(tile.dataset.city)));
 }
 
 function metricValue(metrics, key, fallback = null) { const value = metrics?.[key]; return value == null ? fallback : Number(value); }
@@ -180,7 +230,7 @@ function selectCity(cityId) {
   selectedCityId = cityId;
   const city = payload.cities.find(item => item.cityId === cityId);
   if (!city) return;
-  byId("cityRows").querySelectorAll("tr").forEach(row => row.classList.toggle("selected", row.dataset.city === cityId));
+  byId("cityRows").querySelectorAll("article[data-city]").forEach(tile => tile.classList.toggle("selected", tile.dataset.city === cityId));
   const m = city.metrics || {};
   const weather = cityWeatherText(city.weatherToday);
   const evidence = [
@@ -481,5 +531,5 @@ if (typeof document !== "undefined") {
 }
 
 if (typeof module !== "undefined" && module.exports) {
-  module.exports = {cityWeatherText, fetchDashboardJson, isDashboardPayload, loadDashboardPayload, refresh, renderSummary, renderPools, renderReservedPlans, renderPaperAccount, initializeAccountPeriod, resetAccountPeriod, setAccountPeriod};
+  module.exports = {cityWeatherText, fetchDashboardJson, isDashboardPayload, loadDashboardPayload, refresh, renderSummary, renderPools, renderReservedPlans, renderPaperAccount, initializeAccountPeriod, resetAccountPeriod, setAccountPeriod, cityTileState, compareCityWindowOrder, cityWindowSortKey};
 }

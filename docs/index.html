@@ -6,6 +6,7 @@
   <meta name="color-scheme" content="dark">
   <title>WAP V4 天气交易监控</title>
   <link rel="stylesheet" href="./styles.css?v=20260806-tzfilter">
+  <link rel="stylesheet" href="./profit.css?v=20261025-1">
 </head>
 <body>
   <div class="atmosphere"></div>
@@ -15,7 +16,7 @@
       <span><b>WAP</b><small>WEATHER ALPHA PLATFORM · V4</small></span>
     </a>
     <nav>
-      <a href="#cities">城市池</a><a href="#paper-account">模拟交易</a><a href="#orders">订单</a><a href="#analytics">执行分析</a>
+      <a href="#profit">新策略验证</a><a href="#cities">城市池</a><a href="#paper-account">旧模拟账户</a><a href="#orders">订单</a><a href="#analytics">执行分析</a>
     </nav>
     <div class="system-state" id="systemState">
       <span class="pulse"></span>
@@ -37,13 +38,20 @@
       </div>
     </section>
 
+    <section class="panel" id="profit">
+      <header class="panel-head"><div><p class="kicker">PROFIT-FIRST · FORWARD VALIDATION</p><h2>新策略盈利验证</h2></div><span class="panel-note">先验证净收益 · 全程模拟</span></header>
+      <div id="profitOverview" aria-live="polite"><p class="pf-note">正在读取保存的验证证据…</p></div>
+      <div class="pf-controls"><input id="profitSearch" type="search" aria-label="搜索验证城市" placeholder="搜索城市、站点或时区"><label>合约当地日 <input id="profitDate" type="date" min="2026-10-25"></label><button id="profitToday" type="button">各城市当地今天</button></div>
+      <p class="pf-note" id="profitDateLabel">各城市当地今天</p>
+      <div class="pf-layout"><div id="profitMatrix"></div><aside id="profitDetail" aria-live="polite"></aside></div>
+    </section>
     <section class="metric-grid">
       <article class="metric-card cyan"><span>城市池总数</span><strong id="metricCities">—</strong><small id="metricPools">等待城市注册表</small></article>
       <article class="metric-card violet"><span>今日评估事件</span><strong id="metricDecisions">—</strong><small id="metricQualified">策略通过 —（最新评估）</small></article>
       <article class="metric-card amber"><span>当前占用计划</span><strong id="metricPlans">—</strong><small id="metricAuthorized">已占名额 — / —</small></article>
       <article class="metric-card green"><span>完整成交率</span><strong id="metricFillRate">—</strong><small id="metricFilled">成交 — / 提交 —</small></article>
       <article class="metric-card blue"><span>当前开放风险</span><strong id="metricRisk">—</strong><small id="metricStake">今日成交额 —</small></article>
-      <article class="metric-card pnl"><span>今日已实现 PnL</span><strong id="metricPnl">—</strong><small>仅确认执行事件计入</small></article>
+      <article class="metric-card pnl"><span>旧系统今日事件 PnL</span><strong id="metricPnl">—</strong><small>仅确认执行事件计入</small></article>
     </section>
 
     <section class="alert-stack" id="alerts"></section>
@@ -76,10 +84,10 @@
       <div class="city-layout">
         <div class="city-grid-wrap">
           <div class="city-grid-legend">
-            <span><i style="background:#ffc56e"></i>已推送决策</span>
+            <span><i style="background:#ffc56e"></i>计划已生成 / 通知已确认</span>
             <span><i style="background:#64e6ad"></i>决策进行中</span>
             <span><i style="background:#699cff"></i>未开始</span>
-            <span><i style="background:#6b7c8f"></i>已执行</span>
+            <span><i style="background:#6b7c8f"></i>时段已结束</span>
             <span><i style="background:#ff7285"></i>异常</span>
           </div>
           <div class="city-grid" id="cityRows"></div>
@@ -92,7 +100,7 @@
 
     <section class="panel" id="paper-account">
       <header class="panel-head">
-        <div><p class="kicker">SIMULATED CASH ACCOUNT</p><h2>模拟交易明细与统计</h2></div>
+        <div><p class="kicker">SIMULATED CASH ACCOUNT</p><h2>旧系统模拟交易明细与统计</h2></div>
         <div class="filters account-filters">
           <label class="period-label">账期</label>
           <input id="accountFrom" type="date" title="账期起始（合约本地日）">
@@ -125,6 +133,7 @@
 
     <footer><span>WAP V4 · READ-ONLY MONITOR</span><span id="generatedAt">—</span></footer>
   </main>
-  <script src="./app.js?v=20260903-unified-package-metric" defer></script>
+  <script src="./profit.js?v=20261025-1"></script>
+  <script src="./app.js?v=20261025-profit-display" defer></script>
 </body>
 </html>

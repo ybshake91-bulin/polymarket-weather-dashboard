@@ -220,12 +220,13 @@ function cityTileState(city) {
   const opCode = city.operationalStatus?.code || "";
   const pool = city.poolStatus || "";
   const pushed = Number(city.todayPlans || 0) > 0 || city.hasReservedPlan === true;
-  const inWindow = stage === "DECISION_OPEN" || stage === "WATCHING";
+  const inWindow = stage === "DECISION_OPEN" || stage === "WATCHING" || stage === "TARGET_WINDOW";
   const beforeWindow = stage === "BEFORE_WATCH";
 
   // 1) 已推送决策 —— 最高优先级
   if (pushed) {
-    return {cls: "tile-pushed", label: "已推送决策"};
+    const acked = typeof window !== "undefined" && window.WapProfit?.delivery(city, payload?.profit);
+    return {cls: "tile-pushed", label: acked ? "飞书已确认" : "计划已生成"};
   }
   // 2) 规则阻断（香港 HKO 结算源未适配）—— 结构性阻断，与当日窗口无关
   if (opCode === "BLOCKED_GOVERNANCE" || pool === "BLOCKED_RULE") {
@@ -233,6 +234,8 @@ function cityTileState(city) {
   }
   // 3) 窗口内硬阻断 —— 真正的异常
   const blocker = city.latestEvaluation?.blocker || city.primaryBlocker || "";
+  if (blocker === "BLOCKED_PROFIT_NOT_VALIDATED") return {cls: "tile-pending", label: "验证暂停新仓"};
+  if (blocker === "BLOCKED_PROFIT_POLICY_INVALID") return {cls: "tile-error", label: "盈利准入配置异常"};
   if (inWindow && HARD_BLOCKER_CODES.has(blocker)) {
     return {cls: "tile-error", label: "异常"};
   }
@@ -248,7 +251,7 @@ function cityTileState(city) {
   if (TRADEABLE_POOLS.has(pool) && HARD_BLOCKER_CODES.has(blocker)) {
     return {cls: "tile-error", label: "异常"};
   }
-  return {cls: "tile-pending", label: "已执行"};
+  return {cls: "tile-pending", label: "本时段已结束"};
 }
 
 // 城市本地时钟：targetStartLocal 形如 2026-09-17T10:45:00+12:00。
@@ -581,6 +584,7 @@ function renderBlockers(blockers) {
 
 function render(data) {
   payload = data;
+  if (typeof window !== "undefined") window.WapProfit?.render(data.profit, data.paperAccount);
   renderSummary(data); renderAlerts(data.alerts || []); renderReservedPlans(data.reservedPlans || [], data.paperRisk); renderFunnel(data.funnel); renderPools(data.pools);
   if (selectedCityId && !data.cities.some(city => city.cityId === selectedCityId)) selectedCityId = null;
   initializeAccountPeriod(data.businessDate);

@@ -54,7 +54,7 @@ function renderSummary(data) {
   const pipeline = data.health.pipeline || {};
   const pipelineText = pipeline.status && pipeline.status !== "OK" ? ` · 数据链路 ${pipeline.status}${pipeline.error?.code ? ` (${pipeline.error.code})` : ""}` : "";
   byId("healthLabel").textContent = `${data.health.status}${pipelineText}`;
-  byId("freshness").textContent = freshness(data.health.freshnessSeconds);
+  byId("freshness").textContent = "旧系统活动：" + freshness(data.health.freshnessSeconds);
   byId("systemState").classList.toggle("online", data.health.status === "ONLINE");
   byId("generatedAt").textContent = `SNAPSHOT ${new Date(data.generatedAt).toLocaleString("zh-CN", {hour12:false})}`;
 }

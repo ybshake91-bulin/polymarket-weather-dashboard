@@ -35,7 +35,7 @@
       <details class="pf-fold"><summary>策略规则、各时段验证成绩与飞书通知</summary><p>09:30、12:00 使用独立时段的市场相对概率模型；15:00、17:00 尚未训练天气模型，先采集市场基线，不产生候选交易。候选包括单档 YES、NO 和相邻两档 YES。只读取保存下来的动作。</p><p>概率扣减 ${p(v.policy?.probability_haircut)}；最低净优势 ${p(v.policy?.minimum_edge)}；最低预期收益率 ${p(v.policy?.minimum_roi)}；价差上限 ${p(v.policy?.max_spread)}；最少 ${e(v.policy?.min_shares)} 股。费用压力率至少 ${p(v.policy?.fee_rate_floor)}，按每腿 p×(1−p) 计费；滑点压力每股每腿 ${n(v.policy?.slippage_per_share,3)}u。后续盘口须在 5–120 秒内，沿用原限价与数量。</p>
       <div class="pf-scroll"><table><thead><tr><th>时段</th><th>结算观察数</th><th>模拟净收益</th><th>新模型 Brier</th><th>市场 Brier</th><th>天气基线 Brier</th></tr></thead><tbody>${v.sessions.map(s=>{const z=ev.by_session?.[s];return `<tr><td>${session(s)}</td><td>${e(z?.observations??0)}</td><td>${z?n(z.net_pnl)+'u':'待结算'}</td><td>${n(z?.scores?.brier,4)}</td><td>${n(z?.market_scores?.brier,4)}</td><td>${n(z?.baseline_scores?.brier,4)}</td></tr>`;}).join('')}</tbody></table></div><p class="pf-note">Brier 越低越好。按时段独立比较；下午市场基线不代表已训练好新模型。</p>
       <dl class="pf-facts">${field('飞书验证通知',note.status==='ACTIVE'?'已接入；状态变化时通知':note.status==='RETRY_PENDING'?'发送待确认／重试中':note.status==='DELIVERY_UNCONFIRMED'?'有通知未获平台确认；已停止自动重试':'尚未接入或状态不可读')}${field('已确认通知',note.acked??0)}${field('最近确认',note.lastAckAt||'暂无平台确认')}${field('通知状态更新时间',note.checkedAt||'尚未记录')}</dl><p class="pf-note">首次启动只记录基线；采集异常、官方结算变化、达到复核门槛才通知。去重并限制频率。发送失败不会显示为“已送达”。</p></details>`;
-    renderTiming(r?.timing);
+    renderTiming(r?.timing); renderEvent(v.eventCohort);
     if (!Array.isArray(r?.rows)) { $('profitMatrix').innerHTML='<p class="pf-warning">历史日期数据不可读。</p>';return; }
     const rows = r.rows.filter(x=>(x.city+' '+x.cityName+' '+x.station+' '+x.timezone).toLowerCase().includes(query.toLowerCase()));
     const groups = new Map(); for(const row of rows){if(!groups.has(row.city))groups.set(row.city,[]);groups.get(row.city).push(row);}
@@ -43,6 +43,17 @@
     $('profitMatrix').innerHTML = `<div class="pf-scroll"><table class="pf-matrix"><thead><tr><th>城市 / 合约当地日</th>${v.sessions.map(s=>`<th>${session(s)}<small>${['0930','1200'].includes(s)?'候选验证':'观测研究'}</small></th>`).join('')}</tr></thead><tbody>${[...groups.values()].map(group=>`<tr><th>${e(group[0].cityName)}<small>${e(group[0].station)} · ${e(group[0].date)}</small></th>${v.sessions.map(s=>{const row=group.find(x=>x.session===s);return `<td>${row?`<button type="button" class="pf-cell ${tone(row)} ${key(row)===selected?'selected':''}" data-profit-row="${e(key(row))}" aria-pressed="${key(row)===selected}"><b>${e(status(row))}</b><small>${e(row.reasonText)}</small></button>`:'—'}</td>`;}).join('')}</tr>`).join('') || '<tr><td colspan="5">没有匹配城市。</td></tr>'}</tbody></table></div>`;
     const row = rows.find(x=>key(x)===selected) || rows.find(x=>x.probabilities?.length) || rows[0];
     if(row){selected=key(row);detail(row,r);}else $('profitDetail').innerHTML='<p>请选择城市与时段。</p>';
+  }
+  function renderEvent(c) {
+    let box=$('profitEvent');
+    if(!box){const t=$('profitTiming');if(!t)return;box=document.createElement('section');box.id='profitEvent';box.className='timing-panel';t.after(box);}
+    if(!c){box.innerHTML='';return;}
+    const ev=c.evaluation||{},bs=ev.by_session||{},rows=(c.today||[]).slice(-40).reverse(),rej=(c.rejected||[]).slice(-20).reverse();
+    box.innerHTML=`<p class="kicker">EVENT-V1 · 实测驱动</p><h3>新批次：以机场新实测到达为判断时点</h3><p class="pf-note">${e(c.rule)}。旧固定时点批次继续运行作对照，两者分开统计。机场环境因子修正只评分、不交易。</p>
+      <dl class="pf-facts">${field('已记录信号',ev.signals??0)}${field('已结算城市日',ev.settled_city_days??0)}${field('待结算',ev.pending??0)}${field('模拟成交',ev.simulated_fills??0)}${field('证据错误',ev.errors??0)}${field('最近评估',ev.evaluated_at||'尚未评估')}</dl>
+      <div class="pf-scroll"><table><thead><tr><th>时段</th><th>结算数</th><th>新模型 Brier</th><th>V6 Brier</th><th>机场修正 Brier（同样本 V6）</th><th>市场 Brier</th></tr></thead><tbody>${Object.entries(bs).map(([s,z])=>`<tr><td>${session(s)}</td><td>${e(z.observations)}</td><td>${n(z.scores?.brier,4)}</td><td>${n(z.baseline_scores?.brier,4)}</td><td>${n(z.airport_scores?.brier,4)}（${n(z.airport_paired_baseline?.brier,4)}）</td><td>${n(z.market_scores?.brier,4)}</td></tr>`).join('')||'<tr><td colspan="6">尚无结算</td></tr>'}</tbody></table></div>
+      <details class="pf-fold"><summary>最近信号 ${rows.length} 条 · 未达条件 ${rej.length} 条</summary><div class="pf-scroll"><table><thead><tr><th>城市</th><th>时段</th><th>实测时间</th><th>判断时间</th><th>滞后(分)</th><th>动作</th><th>机场修正</th></tr></thead><tbody>${rows.map(x=>`<tr><td>${e(x.city)}</td><td>${e(x.session?session(x.session):'')}</td><td>${stamp(x.observationAt)}</td><td>${stamp(x.signalAt)}</td><td>${e(x.lagMinutes)}</td><td>${x.action?'有':'无'}</td><td>${e(x.airport||x.status)}</td></tr>`).join('')}</tbody></table></div>
+      <div class="pf-scroll"><table><thead><tr><th>城市</th><th>时段</th><th>原因</th><th>实测时间</th></tr></thead><tbody>${rej.map(x=>`<tr><td>${e(x.city)}</td><td>${e(session(x.session||''))}</td><td>${e(x.reason)}</td><td>${stamp(x.observationAt)}</td></tr>`).join('')}</tbody></table></div></details>`;
   }
   function renderTiming(t) {
     const target=$('profitTiming');if(!target)return;

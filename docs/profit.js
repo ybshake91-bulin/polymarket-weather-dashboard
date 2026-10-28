@@ -9,7 +9,7 @@
   const stamp = x => x ? e(String(x).replace('T',' ').replace('+00:00',' UTC')) : '未记录';
   const key = r => [r.city,r.date,r.session].join('|');
   const session = s => s.slice(0,2) + ':' + s.slice(2);
-  const names = {WAITING:'待窗口',COLLECTING:'采集中',NO_SIGNAL:'未采得',REJECTED:'未达条件',SIGNAL_RECORDED:'等待后续盘口',SIMULATED_FILL:'模拟成交',ABSTAIN:'不交易',NO_FILL:'未成交',EVIDENCE_INVALID:'证据异常',PRE_ACTIVATION:'尚未启用'};
+  const names = {WAITING:'待窗口',COLLECTING:'采集中',NO_SIGNAL:'未采得',REJECTED:'未达条件',SIGNAL_RECORDED:'等待后续盘口',SIMULATED_FILL:'模拟成交',ABSTAIN:'不交易',NO_FILL:'未成交',EVIDENCE_INVALID:'证据异常',PRE_ACTIVATION:'尚未启用',PAUSED:'已暂停'};
   const status = r => names[r.status] || '状态待核验';
   const tone = r => ({SIMULATED_FILL:'good',EVIDENCE_INVALID:'bad',NO_SIGNAL:'warn',REJECTED:'warn',COLLECTING:'active',SIGNAL_RECORDED:'active'}[r.status] || 'quiet');
   const box = (name,value,note,cls='') => `<article class="pf-card ${cls}"><span>${e(name)}</span><strong>${e(value)}</strong><small>${e(note)}</small></article>`;

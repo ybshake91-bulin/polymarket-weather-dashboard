@@ -15,7 +15,7 @@
       k('今日进度',`${t.done||0}/${t.cities||0}`,`进行中 ${t.live||0} · 未开始 ${t.waiting||0}`),
       k('今日下单',`${t.orders||0}`,`有正收益未下 ${t.positiveBlocked||0}`+(t.anomalies?` · 异常 ${t.anomalies}`:''),t.orders?'pos':''),
       k('本月盈亏',`${u(mp,1)}u`,`目标 ${a.monthTargetU||500}u · ${a.monthTrades||0} 笔`,mp>0?'pos':mp<0?'neg':''),
-      k('近7天双档命中',pct(h.d7&&h.d7.rate),`正式城 ${pct(h.d7Formal&&h.d7Formal.rate)} · 30天 ${pct(h.d30&&h.d30.rate)}`),
+      k('近7天双档命中',pct(h.d7&&h.d7.rate),`可预测城 ${pct(h.d7Formal&&h.d7Formal.rate)} · 30天 ${pct(h.d30&&h.d30.rate)}`),
       k('影子(认可允许分歧)',`${(s.agree||{}).n||0} 笔`,`盈亏 ${u((s.agree||{}).pnlU,1)}u · 待结算 ${(s.agree||{}).pending||0}`),
     ].join('');
     $('grid').innerHTML=(x.rows||[]).map(r=>{
@@ -25,7 +25,7 @@
       const hit=r.yesterday==null?'':`<span class="hit ${r.yesterday?'y':'n'}">昨${r.yesterday?'中':'未中'}</span>`;
       const dc=r.tone==='push'?'p':(r.decision==='—'||r.decision==='无正收益')?'x':'';
       const pnl=r.pnl!=null?` <span class="${r.pnl>=0?'pos':'neg'}">${u(r.pnl,1)}u</span>`:'';
-      return `<div class="c ${e(r.tone)}"><div class="h"><b>${e(r.name)}<span class="tag ${r.pool==='正式'?'f':''}">${e(r.pool)}</span></b><span>${e(r.windowBj)} ${hit}</span></div>`+
+      return `<div class="c ${e(r.tone)}"><div class="h"><b>${e(r.name)}<span class="tag ${r.pool==='可预测'?'f':''}">${e(r.pool)}</span></b><span>${e(r.windowBj)} ${hit}</span></div>`+
         `<div class="r"><span>预测</span>${e(pair)} ${r.prob!=null?'<span>'+pct(r.prob)+'</span>':''}</div>`+
         `<div class="r"><span>实测</span>${e(obs)}<span>LLM</span>${e(llm)}</div>`+
         `<div class="d ${dc}">${e(r.decision)}${pnl}</div></div>`;

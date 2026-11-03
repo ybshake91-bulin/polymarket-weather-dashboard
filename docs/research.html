@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="dark"><title>WAP · 新天气策略</title><link rel="stylesheet" href="./styles.css?v=profit-only-20261025"><link rel="stylesheet" href="./profit.css?v=profit-only-20261025"></head>
+<body><header class="topbar"><a class="brand" href="#profit"><span class="brand-mark">W</span><span><b>WAP</b><small>WEATHER · PROFIT RESEARCH</small></span></a><nav aria-label="新策略导航"><a href="#profit">验证概览</a><a href="#timing">时段价值</a><a href="#evidence">城市证据</a></nav><div id="dataHealth" class="health" aria-live="polite">正在读取新策略数据</div></header>
+<main class="shell"><section class="intro"><p class="kicker">WEATHER → MARKET → NET RETURNS</p><h1>天气信号的价值，<em>用净收益验证。</em></h1><p>独立信号、独立模拟记录、独立评估。是否交易取决于价格、成本和证据，而不是到了某个时间。</p></section>
+<div id="loadError" role="status"></div>
+<section class="panel" id="profit"><header class="panel-head"><div><p class="kicker">FORWARD VALIDATION</p><h2>新策略盈利验证</h2></div><span class="panel-note">模拟研究 · 实盘关闭</span></header>
+<div id="profitOverview" aria-live="polite"><p class="pf-note">正在读取保存的验证证据…</p></div>
+<section id="timing" class="timing-panel"><p class="kicker">TIMING & EXECUTABLE PRICES</p><div id="profitTiming"></div></section>
+<section id="evidence"><header class="panel-head"><div><p class="kicker">CITY & SESSION EVIDENCE</p><h2>城市与时段证据</h2></div></header><div class="pf-controls"><input id="profitSearch" type="search" aria-label="搜索验证城市" placeholder="搜索城市、站点或时区"><label>合约当地日 <input id="profitDate" type="date" min="2026-10-25"></label><button id="profitToday" type="button">各城市当地今天</button></div><p class="pf-note" id="profitDateLabel">各城市当地今天</p><div class="pf-layout"><div id="profitMatrix"></div><aside id="profitDetail" aria-live="polite"></aside></div></section>
+</section><footer><span>WAP · NEW SYSTEM · READ-ONLY</span><span id="snapshotTime">等待新策略快照</span><p>公开页面经过发布同步；实际数据时刻以快照与证据时间为准。</p></footer></main>
+<script src="./profit.js?v=profit-only-20261025"></script><script src="./app.js?v=profit-only-20261025" defer></script></body></html>

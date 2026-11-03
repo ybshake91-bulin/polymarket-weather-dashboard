@@ -1,11 +1,34 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="dark"><title>WAP · 新天气策略</title><link rel="stylesheet" href="./styles.css?v=profit-only-20261025"><link rel="stylesheet" href="./profit.css?v=profit-only-20261025"></head>
-<body><header class="topbar"><a class="brand" href="#profit"><span class="brand-mark">W</span><span><b>WAP</b><small>WEATHER · PROFIT RESEARCH</small></span></a><nav aria-label="新策略导航"><a href="#profit">验证概览</a><a href="#timing">时段价值</a><a href="#evidence">城市证据</a></nav><div id="dataHealth" class="health" aria-live="polite">正在读取新策略数据</div></header>
-<main class="shell"><section class="intro"><p class="kicker">WEATHER → MARKET → NET RETURNS</p><h1>天气信号的价值，<em>用净收益验证。</em></h1><p>独立信号、独立模拟记录、独立评估。是否交易取决于价格、成本和证据，而不是到了某个时间。</p></section>
-<div id="loadError" role="status"></div>
-<section class="panel" id="profit"><header class="panel-head"><div><p class="kicker">FORWARD VALIDATION</p><h2>新策略盈利验证</h2></div><span class="panel-note">模拟研究 · 实盘关闭</span></header>
-<div id="profitOverview" aria-live="polite"><p class="pf-note">正在读取保存的验证证据…</p></div>
-<section id="timing" class="timing-panel"><p class="kicker">TIMING & EXECUTABLE PRICES</p><div id="profitTiming"></div></section>
-<section id="evidence"><header class="panel-head"><div><p class="kicker">CITY & SESSION EVIDENCE</p><h2>城市与时段证据</h2></div></header><div class="pf-controls"><input id="profitSearch" type="search" aria-label="搜索验证城市" placeholder="搜索城市、站点或时区"><label>合约当地日 <input id="profitDate" type="date" min="2026-10-25"></label><button id="profitToday" type="button">各城市当地今天</button></div><p class="pf-note" id="profitDateLabel">各城市当地今天</p><div class="pf-layout"><div id="profitMatrix"></div><aside id="profitDetail" aria-live="polite"></aside></div></section>
-</section><footer><span>WAP · NEW SYSTEM · READ-ONLY</span><span id="snapshotTime">等待新策略快照</span><p>公开页面经过发布同步；实际数据时刻以快照与证据时间为准。</p></footer></main>
-<script src="./profit.js?v=profit-only-20261025"></script><script src="./app.js?v=profit-only-20261025" defer></script></body></html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>WAP 看板</title>
+<style>
+:root{color-scheme:dark;--bg:#0b131b;--card:#131f2a;--line:#23384a;--t:#e8f0f5;--m:#8ea3b3;
+--grey:#5d6b78;--gold:#e0b44c;--green:#3fbf7f;--blue:#4a8fe0;--red:#e05656}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--t);font:14px/1.4 "PingFang SC","Microsoft YaHei",system-ui,sans-serif}
+header{display:flex;align-items:baseline;gap:14px;padding:14px 20px;border-bottom:1px solid var(--line)}
+header b{font-size:18px}header span{color:var(--m);font-size:12px}#age{margin-left:auto}
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;padding:14px 20px}
+.k{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.k small{color:var(--m);font-size:12px}.k strong{display:block;font-size:22px;margin-top:2px}.k i{font-style:normal;color:var(--m);font-size:12px}
+.pos{color:var(--green)}.neg{color:var(--red)}
+.legend{display:flex;gap:14px;padding:0 20px 6px;color:var(--m);font-size:12px}
+.legend em{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:middle}
+.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;padding:8px 20px 24px}
+.c{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--blue);border-radius:8px;padding:8px 10px;min-height:92px}
+.c.done{border-left-color:var(--grey)}.c.push{border-left-color:var(--gold);background:#2a2412}.c.live{border-left-color:var(--green)}
+.c.wait{border-left-color:var(--blue);opacity:.75}.c.bad{border-left-color:var(--red)}.c.off{border-left-color:#333;opacity:.45}
+.h{display:flex;justify-content:space-between;align-items:baseline}.h b{font-size:14px}.h span{color:var(--m);font-size:12px}
+.tag{font-size:11px;padding:0 5px;border-radius:4px;background:#22384a;color:#9cc;margin-left:4px}.tag.f{background:#3a2f12;color:var(--gold)}
+.r{display:flex;justify-content:space-between;font-size:13px;margin-top:4px}.r span{color:var(--m)}
+.d{margin-top:5px;font-size:13px;font-weight:600}.d.p{color:var(--gold)}.d.x{color:var(--m);font-weight:400}
+.hit{font-size:11px}.hit.y{color:var(--green)}.hit.n{color:var(--red)}
+@media(max-width:1100px){.grid,.kpis{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:640px){.grid,.kpis{grid-template-columns:repeat(2,1fr)}}
+</style></head>
+<body>
+<header><b>WAP 天气看板</b><span id="meta"></span><span id="age"></span></header>
+<section class="kpis" id="kpis"></section>
+<div class="legend"><span><em style="background:var(--blue)"></em>未开始</span><span><em style="background:var(--green)"></em>进行中</span><span><em style="background:var(--gold)"></em>已下单</span><span><em style="background:var(--grey)"></em>已结束</span><span><em style="background:var(--red)"></em>异常</span><span>时间=北京时间开窗(当地09:30)·档位=中心双档·实测=当日已观测最高</span></div>
+<section class="grid" id="grid"></section>
+<script src="./board.js?v=1"></script>
+</body></html>
